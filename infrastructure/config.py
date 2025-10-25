@@ -118,9 +118,10 @@ class Config:
         # 步骤1: 设置默认配置
         # 这些是应用程序的出厂设置
         self._config = {
-            # AI相关配置
-            'api_key': None,  # API密钥，从环境变量读取
-            'api_provider': 'anthropic',  # 默认使用Anthropic的Claude
+            # 七牛云AI相关配置
+            'qiniu_api_key': None,  # 七牛云API密钥，从环境变量读取
+            'qiniu_base_url': 'https://openai.qiniu.com/v1',  # 七牛云API端点
+            'qiniu_model': 'gpt-4',  # 使用的模型名称
             
             # Homebrew配置
             'homebrew_path': '/opt/homebrew/bin/brew',  # Apple Silicon Mac默认路径
@@ -154,10 +155,9 @@ class Config:
         
         # 步骤3: 从环境变量加载API密钥
         # 环境变量优先级最高，覆盖配置文件
-        # 支持两种AI提供商的环境变量
-        env_api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('OPENAI_API_KEY')
+        env_api_key = os.getenv('QINIU_API_KEY')
         if env_api_key:
-            self._config['api_key'] = env_api_key
+            self._config['qiniu_api_key'] = env_api_key
     
     def get(self, key: str, default: Any = None) -> Any:
         """
@@ -215,10 +215,10 @@ class Config:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         
         # 步骤2: 过滤敏感信息
-        # 创建配置副本，排除api_key
+        # 创建配置副本，排除qiniu_api_key
         save_config = {
             k: v for k, v in self._config.items() 
-            if k != 'api_key'  # 不保存API密钥
+            if k != 'qiniu_api_key'  # 不保存API密钥
         }
         
         # 步骤3: 写入JSON文件
@@ -249,8 +249,8 @@ class Config:
                 print("配置不完整，请设置API密钥")
                 sys.exit(1)
         """
-        # 验证1: 检查API密钥
-        if not self._config.get('api_key'):
+        # 验证1: 检查七牛云API密钥
+        if not self._config.get('qiniu_api_key'):
             return False
         
         # 验证2: 检查Homebrew路径
