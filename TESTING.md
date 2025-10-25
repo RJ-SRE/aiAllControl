@@ -16,9 +16,24 @@ pip install -r requirements.txt
 pip install -e ".[dev]"
 ```
 
-### 2. 配置环境变量（可选）
+### 2. 配置 API 密钥（可选）
 
-某些测试可能需要真实的 API 密钥：
+某些测试可能需要真实的 API 密钥。支持两种配置方式：
+
+#### 方式1: 使用配置文件（推荐）
+
+```bash
+# 创建配置目录
+mkdir -p ~/.macmind
+
+# 复制示例配置文件
+cp config.example.json ~/.macmind/config.json
+
+# 编辑配置文件，填入你的 API Key
+# 使用任意文本编辑器打开 ~/.macmind/config.json
+```
+
+#### 方式2: 使用环境变量
 
 ```bash
 # Anthropic API
@@ -28,7 +43,9 @@ export ANTHROPIC_API_KEY="your-api-key-here"
 export OPENAI_API_KEY="your-api-key-here"
 ```
 
-**注意**：大部分测试使用 Mock，不需要真实 API 密钥。
+**注意**：
+- 大部分测试使用 Mock，不需要真实 API 密钥
+- 配置优先级：环境变量 > 配置文件 > 默认值
 
 ---
 

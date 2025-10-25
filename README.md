@@ -232,11 +232,19 @@ pip install -r requirements.txt
 # 或
 npm install
 
-# 配置 API Key
+# 配置 API Key (两种方式任选其一)
+
+# 方式1: 使用配置文件 (推荐)
+# 创建配置文件: ~/.macmind/config.json
+mkdir -p ~/.macmind
+cp config.example.json ~/.macmind/config.json
+# 编辑 ~/.macmind/config.json，填入你的 API Key
+
+# 方式2: 使用环境变量
 export ANTHROPIC_API_KEY="your-api-key"
 
 # 运行
-python main.py
+python3 main.py
 # 或
 npm start
 ```
