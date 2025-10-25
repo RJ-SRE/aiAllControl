@@ -207,19 +207,31 @@ class OpenAIClient(AIClient):
         这是一个示例实现，展示如何支持多个AI提供商。
     """
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str = None):
         """
         初始化OpenAI客户端
         
         参数:
             api_key: OpenAI API密钥
+            base_url: 自定义API端点URL（可选）
+                     例如: https://openai.qiniu.com/v1
+                     如果不指定，使用官方OpenAI端点
         
         抛出:
             RuntimeError: 如果openai库未安装
+        
+        说明:
+            支持OpenAI兼容的API端点，如七牛云的OpenAI服务。
+            这样设计的好处：
+            1. 向后兼容：不指定base_url时使用官方端点
+            2. 灵活扩展：可以使用任何OpenAI兼容的服务
         """
         try:
             import openai
-            self.client = openai.OpenAI(api_key=api_key)
+            if base_url:
+                self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
+            else:
+                self.client = openai.OpenAI(api_key=api_key)
         except ImportError:
             raise RuntimeError("请安装OpenAI库: pip install openai")
     
@@ -287,8 +299,9 @@ def create_ai_client() -> AIClient:
         调用者无需关心具体实现。
     
     配置说明:
-        - api_key: 从环境变量读取
+        - api_key: 从环境变量或配置文件读取
         - api_provider: 'anthropic' 或 'openai'
+        - openai_base_url: OpenAI兼容端点URL（可选）
     
     扩展方式:
         如需支持新的AI提供商：
@@ -313,6 +326,9 @@ def create_ai_client() -> AIClient:
     if provider == 'anthropic':
         return AnthropicClient(api_key)
     elif provider == 'openai':
-        return OpenAIClient(api_key)
+        # 支持自定义OpenAI兼容端点
+        # 例如七牛云: https://openai.qiniu.com/v1
+        base_url = config.get('openai_base_url')
+        return OpenAIClient(api_key, base_url)
     else:
         raise ValueError(f"不支持的AI提供商: {provider}")

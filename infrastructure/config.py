@@ -15,6 +15,7 @@
 配置项说明:
 - api_key: AI服务的API密钥
 - api_provider: AI提供商 (anthropic/openai)
+- openai_base_url: OpenAI兼容API端点URL (可选，如: https://openai.qiniu.com/v1)
 - homebrew_path: Homebrew可执行文件路径
 - max_search_results: 最大搜索结果数
 - auto_install: 是否自动安装(无需确认)
