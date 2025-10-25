@@ -216,37 +216,440 @@ macOS 自动化:
 ## 🚀 快速开始
 
 ### 环境要求
-- macOS 10.15+
-- Homebrew
-- Python 3.8+ / Node.js 16+
-- Claude API 或 OpenAI API Key
+- **操作系统**: macOS 10.15+ (Catalina 或更高版本)
+- **包管理器**: Homebrew (用于安装和管理软件包)
+- **Python**: Python 3.8+ (建议 3.11+)
+- **API 密钥**: 七牛云 API Key (用于 AI 功能)
 
 ### 安装步骤
+
+#### 1. 克隆项目
 ```bash
-# 克隆项目
 git clone https://github.com/RJ-SRE/aiAllControl.git
 cd aiAllControl
+```
 
-# 安装依赖
+#### 2. 安装依赖
+
+**方式 A: 标准安装**
+```bash
 pip install -r requirements.txt
-# 或
-npm install
+```
 
-# 配置 API Key (两种方式任选其一)
+**方式 B: 开发模式安装(推荐,包含测试工具)**
+```bash
+pip install -e ".[dev]"
+```
 
-# 方式1: 使用配置文件 (推荐)
-# 创建配置文件: ~/.macmind/config.json
+#### 3. 配置 API Key
+
+MacMind 支持两种配置方式,优先级:环境变量 > 配置文件
+
+**方式 1: 使用配置文件(推荐)**
+```bash
+# 创建配置目录
+mkdir -p ~/.macmind
+
+# 复制示例配置文件
+cp config.example.json ~/.macmind/config.json
+
+# 编辑配置文件,填入你的七牛云 API Key
+vim ~/.macmind/config.json  # 或使用其他编辑器
+```
+
+配置文件说明请参阅下方的 [📝 配置文件说明](#-配置文件说明) 章节。
+
+**方式 2: 使用环境变量**
+```bash
+# 设置七牛云 API 密钥
+export QINIU_API_KEY="your-qiniu-api-key-here"
+
+# 可选:永久配置(添加到 ~/.zshrc 或 ~/.bash_profile)
+echo 'export QINIU_API_KEY="your-qiniu-api-key-here"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+#### 4. 验证安装
+```bash
+# 检查 Python 版本
+python3 --version
+
+# 检查 Homebrew 是否安装
+brew --version
+
+# 验证配置是否正确
+python3 -c "from infrastructure.config import config; print('配置加载成功' if config.get('qiniu_api_key') else '请设置 API Key')"
+```
+
+### 运行程序
+
+#### 基本用法
+```bash
+# 运行主程序(交互式命令行界面)
+python3 macmind.py
+```
+
+#### 命令行参数
+
+MacMind 提供多个子命令来执行不同操作:
+
+**1. 搜索软件包**
+```bash
+# 搜索绘图软件
+python3 macmind.py search 绘图软件
+
+# 搜索视频编辑工具
+python3 macmind.py search "video editor"
+```
+
+**2. 安装软件包**
+```bash
+# 安装指定软件包
+python3 macmind.py install drawio
+
+# 安装多个软件包
+python3 macmind.py install vim git wget
+```
+
+**3. 列出已安装软件**
+```bash
+# 列出所有通过 Homebrew 安装的软件
+python3 macmind.py list
+```
+
+**4. 获取软件信息**
+```bash
+# 查看软件详细信息
+python3 macmind.py info vim
+```
+
+**5. 帮助信息**
+```bash
+# 查看所有可用命令
+python3 macmind.py --help
+
+# 查看特定命令的帮助
+python3 macmind.py search --help
+```
+
+### 使用示例
+
+#### 示例 1: 智能搜索并安装绘图软件
+```bash
+$ python3 macmind.py search 绘图软件
+🤖 正在分析需求...
+🔍 搜索到以下软件:
+1. drawio - 流程图和图表绘制工具 (Apache-2.0)
+2. inkscape - 矢量图形编辑器 (GPL-3.0)
+3. krita - 数字绘画软件 (GPL-3.0)
+
+$ python3 macmind.py install drawio
+🤖 准备安装 drawio...
+✅ 安装成功!
+```
+
+#### 示例 2: 列出已安装的开发工具
+```bash
+$ python3 macmind.py list
+📦 已安装的软件包:
+- vim (9.0.1234)
+- git (2.40.0)
+- python@3.11 (3.11.5)
+...
+```
+
+### 常见问题
+
+#### Q1: 提示 "Homebrew not found"
+**解决方案**:
+```bash
+# 安装 Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 如果 Homebrew 安装在非默认位置,修改配置文件
+vim ~/.macmind/config.json
+# 更新 homebrew_path 字段为实际路径
+```
+
+#### Q2: API 请求失败
+**解决方案**:
+```bash
+# 检查 API Key 是否正确配置
+echo $QINIU_API_KEY
+
+# 检查网络连接
+curl -I https://openai.qiniu.com
+
+# 验证 API Key 是否有效(联系七牛云获取)
+```
+
+#### Q3: 权限错误
+**解决方案**:
+```bash
+# 确保配置目录有写权限
+chmod 755 ~/.macmind
+
+# 某些操作可能需要 sudo (不推荐,优先使用 Homebrew)
+# Homebrew 安装通常不需要 sudo
+```
+
+#### Q4: Python 版本不兼容
+**解决方案**:
+```bash
+# 使用 pyenv 管理 Python 版本
+brew install pyenv
+pyenv install 3.11.5
+pyenv global 3.11.5
+
+# 重新安装依赖
+pip install -r requirements.txt
+```
+
+### 高级配置
+
+#### 自定义配置路径
+```bash
+# 使用自定义配置文件
+export MACMIND_CONFIG="/path/to/custom/config.json"
+python3 macmind.py
+```
+
+#### 日志配置
+```bash
+# 日志文件位置: ~/.macmind/logs/macmind.log
+# 查看日志
+tail -f ~/.macmind/logs/macmind.log
+
+# 清理旧日志
+rm ~/.macmind/logs/*.log
+```
+
+#### 启用调试模式
+```python
+# 在 ~/.macmind/config.json 中添加
+{
+  "log_level": "DEBUG",
+  "verbose": true
+}
+```
+
+---
+
+## 📝 配置文件说明
+
+MacMind 使用 JSON 格式的配置文件,位于 `~/.macmind/config.json`。下面详细说明每个配置项的作用。
+
+### 配置文件位置
+- **默认路径**: `~/.macmind/config.json`
+- **示例文件**: 项目根目录的 `config.example.json`
+- **自动创建**: 如果目录不存在,程序会自动创建 `~/.macmind` 目录
+
+### 完整配置示例
+
+```json
+{
+  "qiniu_api_key": "your-qiniu-api-key-here",
+  "qiniu_base_url": "https://openai.qiniu.com/v1",
+  "qiniu_model": "gpt-4",
+  "homebrew_path": "/opt/homebrew/bin/brew",
+  "max_search_results": 5,
+  "auto_install": false,
+  "preferred_license": ["MIT", "Apache-2.0", "GPL-3.0"],
+  "cache_ttl": 3600,
+  "log_level": "INFO",
+  "verbose": false
+}
+```
+
+### 配置项详细说明
+
+#### 🔑 AI 服务配置
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `qiniu_api_key` | string | `null` | **七牛云 API 密钥**<br>• 必填项,用于调用 AI 服务<br>• 建议通过环境变量 `QINIU_API_KEY` 设置<br>• 不会保存到配置文件(安全考虑) |
+| `qiniu_base_url` | string | `"https://openai.qiniu.com/v1"` | **七牛云 API 端点**<br>• AI 服务的 API 地址<br>• 默认使用七牛云 OpenAI 兼容接口<br>• 一般无需修改 |
+| `qiniu_model` | string | `"gpt-4"` | **使用的 AI 模型**<br>• 指定使用的大语言模型<br>• 支持: `gpt-4`, `gpt-3.5-turbo` 等<br>• 不同模型性能和成本不同 |
+
+**示例: 配置 AI 服务**
+```json
+{
+  "qiniu_base_url": "https://openai.qiniu.com/v1",
+  "qiniu_model": "gpt-4"
+}
+```
+
+> ⚠️ **安全提示**: API 密钥建议使用环境变量设置,不要直接写入配置文件
+
+#### 🍺 Homebrew 配置
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `homebrew_path` | string | `"/opt/homebrew/bin/brew"` | **Homebrew 可执行文件路径**<br>• Apple Silicon (M1/M2) Mac: `/opt/homebrew/bin/brew`<br>• Intel Mac: `/usr/local/bin/brew`<br>• 自定义安装路径需修改此配置 |
+
+**示例: Intel Mac 配置**
+```json
+{
+  "homebrew_path": "/usr/local/bin/brew"
+}
+```
+
+**如何查找 Homebrew 路径**:
+```bash
+which brew
+# 输出: /opt/homebrew/bin/brew 或 /usr/local/bin/brew
+```
+
+#### 🔍 搜索和安装配置
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `max_search_results` | integer | `5` | **最大搜索结果数**<br>• 限制搜索返回的软件包数量<br>• 范围: 1-20<br>• 过多会影响阅读体验 |
+| `auto_install` | boolean | `false` | **自动安装模式**<br>• `true`: 安装时不需要确认<br>• `false`: 每次安装需要用户确认<br>• **建议保持 `false`(安全)** |
+| `preferred_license` | array | `["MIT", "Apache-2.0", "GPL-3.0"]` | **优先许可证列表**<br>• AI 搜索时优先推荐这些开源协议<br>• 确保推荐的软件免费可用<br>• 支持: MIT, Apache-2.0, GPL-3.0, BSD 等 |
+
+**示例: 搜索配置优化**
+```json
+{
+  "max_search_results": 10,
+  "auto_install": false,
+  "preferred_license": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause"]
+}
+```
+
+#### ⚡ 性能配置
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `cache_ttl` | integer | `3600` | **缓存有效期(秒)**<br>• 搜索结果缓存时间<br>• `3600` = 1小时<br>• 设为 `0` 禁用缓存 |
+
+**示例: 缓存配置**
+```json
+{
+  "cache_ttl": 7200
+}
+```
+
+#### 📊 日志配置 (可选)
+
+这些配置项是可选的,默认情况下不需要配置。
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `log_level` | string | `"INFO"` | **日志级别**<br>• `DEBUG`: 详细调试信息<br>• `INFO`: 一般信息(推荐)<br>• `WARNING`: 警告信息<br>• `ERROR`: 仅错误信息 |
+| `verbose` | boolean | `false` | **详细输出模式**<br>• `true`: 输出详细执行信息<br>• `false`: 简洁输出 |
+
+**示例: 开启调试模式**
+```json
+{
+  "log_level": "DEBUG",
+  "verbose": true
+}
+```
+
+### 配置优先级
+
+MacMind 按以下优先级加载配置(从高到低):
+
+1. **环境变量** (最高优先级)
+   - `QINIU_API_KEY`: 七牛云 API 密钥
+   - `MACMIND_CONFIG`: 自定义配置文件路径
+
+2. **配置文件**
+   - `~/.macmind/config.json`
+
+3. **默认值** (最低优先级)
+   - 代码中定义的默认配置
+
+### 配置文件管理
+
+#### 创建配置文件
+```bash
+# 从示例创建
 mkdir -p ~/.macmind
 cp config.example.json ~/.macmind/config.json
-# 编辑 ~/.macmind/config.json，填入你的 API Key
 
-# 方式2: 使用环境变量
-export ANTHROPIC_API_KEY="your-api-key"
+# 编辑配置
+vim ~/.macmind/config.json
+```
 
-# 运行
-python3 main.py
-# 或
-npm start
+#### 验证配置
+```bash
+# 验证配置是否有效
+python3 -c "from infrastructure.config import config; print('✅ 配置有效' if config.validate() else '❌ 配置无效')"
+```
+
+#### 查看当前配置
+```bash
+# 查看配置文件
+cat ~/.macmind/config.json
+
+# 或使用 Python
+python3 -c "from infrastructure.config import config; import json; print(json.dumps(config._config, indent=2, ensure_ascii=False))"
+```
+
+#### 重置配置
+```bash
+# 删除配置文件,将使用默认配置
+rm ~/.macmind/config.json
+
+# 或重新复制示例文件
+cp config.example.json ~/.macmind/config.json
+```
+
+### 最佳实践
+
+#### ✅ 推荐做法
+1. **API 密钥使用环境变量**: 不要将密钥写入配置文件
+   ```bash
+   export QINIU_API_KEY="your-key"
+   ```
+
+2. **保持 `auto_install` 为 `false`**: 确保安装前有确认步骤
+
+3. **根据需求调整 `max_search_results`**: 新手使用 5,熟练后可增加到 10
+
+4. **定期备份配置文件**:
+   ```bash
+   cp ~/.macmind/config.json ~/.macmind/config.json.backup
+   ```
+
+#### ❌ 避免做法
+1. **不要将配置文件提交到 Git**: 可能包含敏感信息
+2. **不要设置过长的 `cache_ttl`**: 可能导致数据过时
+3. **不要在生产环境开启 DEBUG**: 会产生大量日志
+
+### 配置问题排查
+
+#### 问题: 提示 "API Key not found"
+```bash
+# 检查环境变量
+echo $QINIU_API_KEY
+
+# 检查配置文件
+cat ~/.macmind/config.json | grep qiniu_api_key
+
+# 验证配置
+python3 -c "from infrastructure.config import config; print(config.get('qiniu_api_key'))"
+```
+
+#### 问题: Homebrew 路径错误
+```bash
+# 查找正确路径
+which brew
+
+# 更新配置文件
+vim ~/.macmind/config.json
+# 修改 "homebrew_path" 为正确路径
+```
+
+#### 问题: 配置文件损坏
+```bash
+# 验证 JSON 格式
+python3 -m json.tool ~/.macmind/config.json
+
+# 如果格式错误,重新创建
+cp config.example.json ~/.macmind/config.json
 ```
 
 ---

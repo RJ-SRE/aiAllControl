@@ -1,14 +1,53 @@
 {
-  "api_key": "your-api-key-here",
-  "api_provider": "anthropic",
-  "openai_base_url": "",
+  "_comment": "MacMind 配置文件示例 - 请复制到 ~/.macmind/config.json 并修改相应值",
+  
+  "_section_ai": "========== AI 服务配置 ==========",
+  "qiniu_api_key": "your-qiniu-api-key-here",
+  "_qiniu_api_key_note": "七牛云 API 密钥 - 建议使用环境变量 QINIU_API_KEY 设置(更安全)",
+  
+  "qiniu_base_url": "https://openai.qiniu.com/v1",
+  "_qiniu_base_url_note": "七牛云 API 端点 - 默认使用七牛云 OpenAI 兼容接口",
+  
+  "qiniu_model": "gpt-4",
+  "_qiniu_model_note": "AI 模型名称 - 可选: gpt-4, gpt-3.5-turbo 等",
+  
+  "_section_homebrew": "========== Homebrew 配置 ==========",
   "homebrew_path": "/opt/homebrew/bin/brew",
+  "_homebrew_path_note": "Homebrew 可执行文件路径 - Apple Silicon (M1/M2): /opt/homebrew/bin/brew | Intel Mac: /usr/local/bin/brew",
+  
+  "_section_search": "========== 搜索和安装配置 ==========",
   "max_search_results": 5,
+  "_max_search_results_note": "最大搜索结果数 - 范围: 1-20, 推荐: 5-10",
+  
   "auto_install": false,
+  "_auto_install_note": "自动安装模式 - true: 无需确认 | false: 需要确认(推荐)",
+  
   "preferred_license": [
     "MIT",
     "Apache-2.0",
     "GPL-3.0"
   ],
-  "cache_ttl": 3600
+  "_preferred_license_note": "优先许可证列表 - AI 搜索时优先推荐这些开源协议的软件",
+  
+  "_section_performance": "========== 性能配置 ==========",
+  "cache_ttl": 3600,
+  "_cache_ttl_note": "缓存有效期(秒) - 3600=1小时 | 7200=2小时 | 0=禁用缓存",
+  
+  "_section_logging": "========== 日志配置 (可选) ==========",
+  "_logging_comment": "以下配置项为可选,如不需要可以删除",
+  
+  "log_level": "INFO",
+  "_log_level_note": "日志级别 - DEBUG(详细) | INFO(推荐) | WARNING | ERROR",
+  
+  "verbose": false,
+  "_verbose_note": "详细输出模式 - true: 详细 | false: 简洁",
+  
+  "_usage_instructions": "========== 使用说明 ==========",
+  "_instruction_1": "1. 复制此文件到 ~/.macmind/config.json",
+  "_instruction_2": "2. 修改 qiniu_api_key 为你的真实 API 密钥",
+  "_instruction_3": "3. 根据你的 Mac 类型调整 homebrew_path",
+  "_instruction_4": "4. 其他配置项可保持默认值或根据需要调整",
+  "_instruction_5": "5. 所有以 '_' 开头的注释字段会被程序忽略",
+  
+  "_security_notice": "⚠️ 安全提示: 不要将包含真实 API 密钥的配置文件提交到 Git 仓库"
 }
