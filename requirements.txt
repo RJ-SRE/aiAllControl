@@ -1,0 +1,16 @@
+# MacMind 基础设施层依赖
+# Infrastructure Layer Dependencies
+
+# AI 客户端
+anthropic>=0.40.0        # Anthropic Claude API 客户端
+openai>=1.50.0           # OpenAI GPT API 客户端（可选）
+
+# 测试框架
+pytest>=8.0.0            # 单元测试框架
+pytest-cov>=6.0.0        # 测试覆盖率
+pytest-mock>=3.14.0      # Mock 功能
+
+# 开发工具
+black>=24.0.0            # 代码格式化
+flake8>=7.0.0            # 代码检查
+mypy>=1.13.0             # 类型检查
