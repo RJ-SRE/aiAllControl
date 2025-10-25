@@ -36,15 +36,16 @@ class TestAIClientAbstract:
 class TestAnthropicClient:
     """测试Anthropic客户端"""
     
-    @patch('infrastructure.ai_client.anthropic')
-    def test_client_initialization(self, mock_anthropic):
+    def test_client_initialization(self):
         """测试客户端初始化"""
+        mock_anthropic = Mock()
         mock_anthropic.Anthropic = Mock()
         
-        client = AnthropicClient('test_api_key')
-        
-        assert client is not None, "客户端应该能正常创建"
-        mock_anthropic.Anthropic.assert_called_once_with(api_key='test_api_key')
+        with patch.dict('sys.modules', {'anthropic': mock_anthropic}):
+            client = AnthropicClient('test_api_key')
+            
+            assert client is not None, "客户端应该能正常创建"
+            mock_anthropic.Anthropic.assert_called_once_with(api_key='test_api_key')
     
     def test_client_missing_library(self):
         """测试anthropic库未安装"""
@@ -52,8 +53,7 @@ class TestAnthropicClient:
             with pytest.raises(RuntimeError, match="请安装Anthropic库"):
                 AnthropicClient('test_key')
     
-    @patch('infrastructure.ai_client.anthropic')
-    def test_analyze_intent_success(self, mock_anthropic):
+    def test_analyze_intent_success(self):
         """测试成功分析意图"""
         mock_message = Mock()
         mock_message.content = [Mock(text=json.dumps({
@@ -64,58 +64,66 @@ class TestAnthropicClient:
         
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_message
+        
+        mock_anthropic = Mock()
         mock_anthropic.Anthropic.return_value = mock_client
         
-        client = AnthropicClient('test_key')
-        result = client.analyze_intent("帮我找一个绘图软件")
-        
-        assert result['intent'] == '搜索', "应该正确识别意图"
-        assert result['keyword'] == '绘图软件', "应该正确提取关键词"
-        assert result['category'] == '绘图', "应该正确识别类别"
+        with patch.dict('sys.modules', {'anthropic': mock_anthropic}):
+            client = AnthropicClient('test_key')
+            result = client.analyze_intent("帮我找一个绘图软件")
+            
+            assert result['intent'] == '搜索', "应该正确识别意图"
+            assert result['keyword'] == '绘图软件', "应该正确提取关键词"
+            assert result['category'] == '绘图', "应该正确识别类别"
     
-    @patch('infrastructure.ai_client.anthropic')
-    def test_analyze_intent_with_error_fallback(self, mock_anthropic):
+    def test_analyze_intent_with_error_fallback(self):
         """测试分析失败时的降级处理"""
         mock_client = Mock()
         mock_client.messages.create.side_effect = Exception("API Error")
+        
+        mock_anthropic = Mock()
         mock_anthropic.Anthropic.return_value = mock_client
         
-        client = AnthropicClient('test_key')
-        result = client.analyze_intent("搜索vim")
-        
-        assert result['intent'] == '搜索', "降级后应该返回默认意图"
-        assert result['keyword'] == '搜索vim', "降级后应该使用原始输入作为关键词"
-        assert result['category'] == '', "降级后类别为空"
+        with patch.dict('sys.modules', {'anthropic': mock_anthropic}):
+            client = AnthropicClient('test_key')
+            result = client.analyze_intent("搜索vim")
+            
+            assert result['intent'] == '搜索', "降级后应该返回默认意图"
+            assert result['keyword'] == '搜索vim', "降级后应该使用原始输入作为关键词"
+            assert result['category'] == '', "降级后类别为空"
     
-    @patch('infrastructure.ai_client.anthropic')
-    def test_analyze_intent_calls_correct_model(self, mock_anthropic):
+    def test_analyze_intent_calls_correct_model(self):
         """测试使用正确的模型"""
         mock_message = Mock()
         mock_message.content = [Mock(text='{"intent":"搜索","keyword":"test","category":""}')]
         
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_message
+        
+        mock_anthropic = Mock()
         mock_anthropic.Anthropic.return_value = mock_client
         
-        client = AnthropicClient('test_key')
-        client.analyze_intent("test")
-        
-        call_args = mock_client.messages.create.call_args
-        assert call_args[1]['model'] == 'claude-3-5-sonnet-20241022', "应该使用正确的模型"
+        with patch.dict('sys.modules', {'anthropic': mock_anthropic}):
+            client = AnthropicClient('test_key')
+            client.analyze_intent("test")
+            
+            call_args = mock_client.messages.create.call_args
+            assert call_args[1]['model'] == 'claude-3-5-sonnet-20241022', "应该使用正确的模型"
 
 
 class TestOpenAIClient:
     """测试OpenAI客户端"""
     
-    @patch('infrastructure.ai_client.openai')
-    def test_client_initialization(self, mock_openai):
+    def test_client_initialization(self):
         """测试客户端初始化"""
+        mock_openai = Mock()
         mock_openai.OpenAI = Mock()
         
-        client = OpenAIClient('test_api_key')
-        
-        assert client is not None, "客户端应该能正常创建"
-        mock_openai.OpenAI.assert_called_once_with(api_key='test_api_key')
+        with patch.dict('sys.modules', {'openai': mock_openai}):
+            client = OpenAIClient('test_api_key')
+            
+            assert client is not None, "客户端应该能正常创建"
+            mock_openai.OpenAI.assert_called_once_with(api_key='test_api_key')
     
     def test_client_missing_library(self):
         """测试openai库未安装"""
@@ -123,8 +131,7 @@ class TestOpenAIClient:
             with pytest.raises(RuntimeError, match="请安装OpenAI库"):
                 OpenAIClient('test_key')
     
-    @patch('infrastructure.ai_client.openai')
-    def test_analyze_intent_success(self, mock_openai):
+    def test_analyze_intent_success(self):
         """测试成功分析意图"""
         mock_response = Mock()
         mock_response.choices = [
@@ -137,60 +144,67 @@ class TestOpenAIClient:
         
         mock_client = Mock()
         mock_client.chat.completions.create.return_value = mock_response
+        
+        mock_openai = Mock()
         mock_openai.OpenAI.return_value = mock_client
         
-        client = OpenAIClient('test_key')
-        result = client.analyze_intent("安装一个编辑器")
-        
-        assert result['intent'] == '安装', "应该正确识别意图"
-        assert result['keyword'] == '编辑器', "应该正确提取关键词"
+        with patch.dict('sys.modules', {'openai': mock_openai}):
+            client = OpenAIClient('test_key')
+            result = client.analyze_intent("安装一个编辑器")
+            
+            assert result['intent'] == '安装', "应该正确识别意图"
+            assert result['keyword'] == '编辑器', "应该正确提取关键词"
     
-    @patch('infrastructure.ai_client.openai')
-    def test_analyze_intent_with_error_fallback(self, mock_openai):
+    def test_analyze_intent_with_error_fallback(self):
         """测试分析失败时的降级处理"""
         mock_client = Mock()
         mock_client.chat.completions.create.side_effect = Exception("API Error")
+        
+        mock_openai = Mock()
         mock_openai.OpenAI.return_value = mock_client
         
-        client = OpenAIClient('test_key')
-        result = client.analyze_intent("测试输入")
-        
-        assert result['intent'] == '搜索', "降级后应该返回默认意图"
-        assert result['keyword'] == '测试输入', "降级后应该使用原始输入"
+        with patch.dict('sys.modules', {'openai': mock_openai}):
+            client = OpenAIClient('test_key')
+            result = client.analyze_intent("测试输入")
+            
+            assert result['intent'] == '搜索', "降级后应该返回默认意图"
+            assert result['keyword'] == '测试输入', "降级后应该使用原始输入"
 
 
 class TestCreateAIClient:
     """测试工厂函数"""
     
     @patch('infrastructure.ai_client.config')
-    @patch('infrastructure.ai_client.anthropic')
-    def test_create_anthropic_client(self, mock_anthropic, mock_config):
+    def test_create_anthropic_client(self, mock_config):
         """测试创建Anthropic客户端"""
         mock_config.get.side_effect = lambda key, default=None: {
             'api_key': 'test_key',
             'api_provider': 'anthropic'
         }.get(key, default)
         
+        mock_anthropic = Mock()
         mock_anthropic.Anthropic = Mock()
         
-        client = create_ai_client()
-        
-        assert isinstance(client, AnthropicClient), "应该创建Anthropic客户端"
+        with patch.dict('sys.modules', {'anthropic': mock_anthropic}):
+            client = create_ai_client()
+            
+            assert isinstance(client, AnthropicClient), "应该创建Anthropic客户端"
     
     @patch('infrastructure.ai_client.config')
-    @patch('infrastructure.ai_client.openai')
-    def test_create_openai_client(self, mock_openai, mock_config):
+    def test_create_openai_client(self, mock_config):
         """测试创建OpenAI客户端"""
         mock_config.get.side_effect = lambda key, default=None: {
             'api_key': 'test_key',
             'api_provider': 'openai'
         }.get(key, default)
         
+        mock_openai = Mock()
         mock_openai.OpenAI = Mock()
         
-        client = create_ai_client()
-        
-        assert isinstance(client, OpenAIClient), "应该创建OpenAI客户端"
+        with patch.dict('sys.modules', {'openai': mock_openai}):
+            client = create_ai_client()
+            
+            assert isinstance(client, OpenAIClient), "应该创建OpenAI客户端"
     
     @patch('infrastructure.ai_client.config')
     def test_create_client_without_api_key(self, mock_config):
@@ -215,8 +229,7 @@ class TestCreateAIClient:
 class TestAIClientIntegration:
     """测试集成场景"""
     
-    @patch('infrastructure.ai_client.anthropic')
-    def test_full_workflow(self, mock_anthropic):
+    def test_full_workflow(self):
         """测试完整工作流程"""
         mock_message = Mock()
         mock_message.content = [Mock(text=json.dumps({
@@ -227,15 +240,18 @@ class TestAIClientIntegration:
         
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_message
+        
+        mock_anthropic = Mock()
         mock_anthropic.Anthropic.return_value = mock_client
         
-        client = AnthropicClient('test_key')
-        
-        result = client.analyze_intent("帮我找一个像vim的编辑器")
-        
-        assert 'intent' in result, "结果应该包含意图"
-        assert 'keyword' in result, "结果应该包含关键词"
-        assert 'category' in result, "结果应该包含类别"
+        with patch.dict('sys.modules', {'anthropic': mock_anthropic}):
+            client = AnthropicClient('test_key')
+            
+            result = client.analyze_intent("帮我找一个像vim的编辑器")
+            
+            assert 'intent' in result, "结果应该包含意图"
+            assert 'keyword' in result, "结果应该包含关键词"
+            assert 'category' in result, "结果应该包含类别"
 
 
 if __name__ == '__main__':
