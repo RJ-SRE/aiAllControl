@@ -180,28 +180,35 @@ class QiniuClient(AIClient):
             raise RuntimeError(f"AI模型推理失败,程序停止执行: {e}")
 
 
-def create_ai_client() -> AIClient:
+def create_ai_client(use_mcp: bool = None) -> AIClient:
     """
-    工厂函数 - 创建七牛云AI客户端
+    工厂函数 - 创建AI客户端(支持MCP模式)
+    
+    参数:
+        use_mcp: 是否使用MCP客户端(None=从配置读取, True=强制MCP, False=直接调用)
     
     返回:
-        AIClient: 七牛云AI客户端实例
+        AIClient: AI客户端实例(MCP或直接调用)
     
     抛出:
         RuntimeError: API密钥未配置
     
     设计模式: 工厂模式
-        创建七牛云大模型推理客户端。
+        根据配置创建MCP客户端或直接调用客户端。
     
     配置说明:
+        - use_mcp: 是否使用MCP协议(默认: true)
         - qiniu_api_key: 七牛云 API 密钥(从环境变量或配置文件读取)
         - qiniu_base_url: 七牛云 API 端点 URL(可选,默认: https://openai.qiniu.com/v1)
         - qiniu_model: 使用的模型名称(可选,默认: gpt-4)
     
     示例:
-        # 创建七牛云客户端
-        client = create_ai_client()
-        result = client.analyze_intent("搜索绘图软件")
+        # 创建MCP客户端(推荐)
+        client = create_ai_client()  # 从配置读取
+        client = create_ai_client(use_mcp=True)  # 强制使用MCP
+        
+        # 创建直接调用客户端(兼容模式)
+        client = create_ai_client(use_mcp=False)
     """
     api_key = config.get('qiniu_api_key')
     if not api_key:
@@ -214,4 +221,16 @@ def create_ai_client() -> AIClient:
     base_url = config.get('qiniu_base_url', 'https://openai.qiniu.com/v1')
     model = config.get('qiniu_model', 'gpt-4')
     
-    return QiniuClient(api_key, base_url, model)
+    # 决定使用哪种客户端
+    if use_mcp is None:
+        use_mcp = config.get('use_mcp', True)  # 默认使用MCP
+    
+    if use_mcp:
+        # 使用MCP客户端
+        from infrastructure.mcp_client import create_mcp_client
+        logger.info("使用MCP客户端模式")
+        return create_mcp_client(api_key, base_url, model)
+    else:
+        # 使用直接调用模式(向后兼容)
+        logger.info("使用直接调用模式")
+        return QiniuClient(api_key, base_url, model)
