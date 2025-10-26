@@ -450,6 +450,356 @@ class MacController:
         
         return guide_text.strip()
     
+    def send_notification(self, title: str, message: str, subtitle: Optional[str] = None, sound: bool = True) -> bool:
+        """
+        发送系统通知
+        
+        参数:
+            title: 通知标题
+            message: 通知内容
+            subtitle: 副标题(可选)
+            sound: 是否播放提示音
+        
+        返回:
+            bool: 发送是否成功
+        
+        示例:
+            controller.send_notification(
+                "MacMind", 
+                "软件安装完成",
+                subtitle="drawio已成功安装"
+            )
+        """
+        title = self._escape_applescript_string(title)
+        message = self._escape_applescript_string(message)
+        
+        script_parts = [f'display notification "{message}" with title "{title}"']
+        
+        if subtitle:
+            subtitle = self._escape_applescript_string(subtitle)
+            script_parts[0] = f'display notification "{message}" with title "{title}" subtitle "{subtitle}"'
+        
+        if sound:
+            script_parts[0] += ' sound name "default"'
+        
+        script = script_parts[0]
+        
+        try:
+            self._execute_applescript(script)
+            logger.info(f"已发送通知: {title}")
+            return True
+        except MacControlError:
+            logger.error(f"发送通知失败: {title}")
+            return False
+    
+    def get_notification_settings(self, app_name: str) -> Optional[Dict]:
+        """
+        获取应用的通知设置信息
+        
+        参数:
+            app_name: 应用名称
+        
+        返回:
+            Dict: 通知设置信息,失败返回None
+        
+        说明:
+            由于macOS安全限制,只能提供引导信息,无法直接读取设置
+        
+        示例:
+            settings = controller.get_notification_settings("Safari")
+        """
+        bundle_id = self.get_app_bundle_id(app_name)
+        
+        if not bundle_id:
+            logger.warning(f"无法获取Bundle ID: {app_name}")
+            return None
+        
+        return {
+            "app_name": app_name,
+            "bundle_id": bundle_id,
+            "settings_path": "系统偏好设置 → 通知",
+            "note": "由于macOS安全限制,需要手动查看和修改通知设置"
+        }
+    
+    def disable_app_notifications(self, app_name: str) -> str:
+        """
+        引导用户禁用应用通知
+        
+        参数:
+            app_name: 应用名称
+        
+        返回:
+            str: 引导说明文本
+        
+        说明:
+            由于macOS安全限制,无法通过脚本直接修改,
+            此方法提供详细的操作引导并打开系统设置
+        
+        示例:
+            guide = controller.disable_app_notifications("网易云音乐")
+            print(guide)
+        """
+        bundle_id = self.get_app_bundle_id(app_name)
+        bundle_info = f"\nBundle ID: {bundle_id}" if bundle_id else ""
+        
+        guide_text = f"""
+🔕 禁用 {app_name} 的通知{bundle_info}
+
+由于macOS安全限制,需要手动设置:
+
+步骤:
+1. 打开"系统偏好设置" → "通知"
+2. 在左侧列表中找到"{app_name}"
+3. 取消勾选"允许通知"
+
+提示: 系统设置面板将自动打开
+"""
+        
+        logger.info(f"引导用户禁用通知: {app_name}")
+        
+        try:
+            self.open_system_preferences("com.apple.preference.notifications")
+        except Exception:
+            pass
+        
+        return guide_text.strip()
+    
+    def enable_app_notifications(self, app_name: str) -> str:
+        """
+        引导用户启用应用通知
+        
+        参数:
+            app_name: 应用名称
+        
+        返回:
+            str: 引导说明文本
+        
+        说明:
+            由于macOS安全限制,无法通过脚本直接修改,
+            此方法提供详细的操作引导并打开系统设置
+        
+        示例:
+            guide = controller.enable_app_notifications("Safari")
+            print(guide)
+        """
+        bundle_id = self.get_app_bundle_id(app_name)
+        bundle_info = f"\nBundle ID: {bundle_id}" if bundle_id else ""
+        
+        guide_text = f"""
+🔔 启用 {app_name} 的通知{bundle_info}
+
+由于macOS安全限制,需要手动设置:
+
+步骤:
+1. 打开"系统偏好设置" → "通知"
+2. 在左侧列表中找到"{app_name}"
+3. 勾选"允许通知"
+4. 根据需要选择通知样式(横幅、提醒或无)
+
+提示: 系统设置面板将自动打开
+"""
+        
+        logger.info(f"引导用户启用通知: {app_name}")
+        
+        try:
+            self.open_system_preferences("com.apple.preference.notifications")
+        except Exception:
+            pass
+        
+        return guide_text.strip()
+    
+    def create_keyboard_shortcut_guide(self, shortcut: str, action: str, apps: List[str] = None) -> str:
+        """
+        生成创建快捷键的引导说明
+        
+        参数:
+            shortcut: 快捷键组合(如"Command+L")
+            action: 要执行的操作描述
+            apps: 要打开的应用列表(可选)
+        
+        返回:
+            str: 详细的引导说明
+        
+        说明:
+            由于macOS限制,无法直接创建快捷键,需要通过Automator或第三方工具。
+            此方法提供两种方案:系统服务和Hammerspoon
+        
+        示例:
+            guide = controller.create_keyboard_shortcut_guide(
+                "Command+Shift+L",
+                "打开工作应用",
+                ["企业微信", "WPS"]
+            )
+        """
+        apps_list = ""
+        if apps:
+            apps_list = "\n".join([f"  - {app}" for app in apps])
+            apps_section = f"\n\n要打开的应用:\n{apps_list}"
+        else:
+            apps_section = ""
+        
+        guide_text = f"""
+⌨️  创建快捷键: {shortcut}
+操作: {action}{apps_section}
+
+由于macOS安全限制,无法通过脚本直接创建快捷键。
+推荐使用以下两种方案:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+方案 1: 使用 Automator (系统自带)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+步骤:
+1. 打开"Automator"应用
+2. 选择"快速操作"(Quick Action)
+3. 在左侧库中找到"运行AppleScript"
+4. 将以下脚本粘贴到编辑器:
+
+"""
+        
+        if apps:
+            guide_text += "\n```applescript\n"
+            for app in apps:
+                guide_text += f'tell application "{app}" to activate\n'
+            guide_text += "```\n"
+        else:
+            guide_text += "\n```applescript\n-- 在此添加你的AppleScript代码\n```\n"
+        
+        guide_text += f"""
+5. 保存服务(例如命名为"{action}")
+6. 打开"系统偏好设置" → "键盘" → "快捷键" → "服务"
+7. 找到你创建的服务,设置快捷键为 {shortcut}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+方案 2: 使用 Hammerspoon (更灵活,推荐)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+步骤:
+1. 安装 Hammerspoon:
+   brew install hammerspoon
+
+2. 打开 Hammerspoon,在菜单栏点击 "Open Config"
+
+3. 在配置文件中添加:
+
+```lua"""
+        
+        if apps:
+            shortcut_parts = shortcut.lower().replace("command", "cmd").replace("+", '", "')
+            shortcut_parts = shortcut_parts.split(", ")
+            key = shortcut_parts[-1].strip()
+            modifiers = '", "'.join([s.strip() for s in shortcut_parts[:-1]])
+            
+            guide_text += f"\nhs.hotkey.bind({{\"{modifiers}\"}}, \"{key}\", function()\n"
+            for app in apps:
+                guide_text += f'  hs.application.launchOrFocus("{app}")\n'
+            guide_text += "end)\n```\n"
+        else:
+            guide_text += "\nhs.hotkey.bind({\"cmd\", \"shift\"}, \"l\", function()\n"
+            guide_text += "  -- 在此添加你的操作\n"
+            guide_text += "end)\n```\n"
+        
+        guide_text += "\n4. 保存并重新加载 Hammerspoon 配置\n"
+        guide_text += "\n💡 提示: Hammerspoon 方案更灵活,支持复杂操作和条件判断"
+        
+        logger.info(f"生成快捷键引导: {shortcut}")
+        return guide_text.strip()
+    
+    def install_hammerspoon(self) -> bool:
+        """
+        引导安装 Hammerspoon
+        
+        返回:
+            bool: 是否成功引导安装
+        
+        说明:
+            Hammerspoon 是一个强大的 macOS 自动化工具,
+            可用于创建快捷键、窗口管理等
+        """
+        try:
+            import subprocess
+            
+            print("🔧 准备安装 Hammerspoon...")
+            print("Hammerspoon 是一个强大的 macOS 自动化工具")
+            print()
+            
+            result = subprocess.run(
+                ['brew', 'info', 'hammerspoon'],
+                capture_output=True,
+                text=True
+            )
+            
+            if "Not installed" in result.stdout:
+                print("正在通过 Homebrew 安装 Hammerspoon...")
+                install_result = subprocess.run(
+                    ['brew', 'install', 'hammerspoon', '--cask'],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if install_result.returncode == 0:
+                    print("✅ Hammerspoon 安装成功!")
+                    print("\n下一步:")
+                    print("1. 在应用程序中打开 Hammerspoon")
+                    print("2. 授予必要的辅助功能权限")
+                    print("3. 使用 'Open Config' 编辑配置文件")
+                    return True
+                else:
+                    print(f"❌ 安装失败: {install_result.stderr}")
+                    return False
+            else:
+                print("✅ Hammerspoon 已安装")
+                return True
+                
+        except Exception as e:
+            logger.error(f"安装 Hammerspoon 失败: {e}")
+            print(f"❌ 安装过程出错: {e}")
+            return False
+    
+    def check_keyboard_shortcut_conflicts(self, shortcut: str) -> Dict:
+        """
+        检查快捷键冲突
+        
+        参数:
+            shortcut: 快捷键组合(如"Command+L")
+        
+        返回:
+            Dict: 冲突检查结果
+        
+        说明:
+            提供常见系统快捷键的冲突检查
+        """
+        common_shortcuts = {
+            "Command+L": "锁定屏幕",
+            "Command+Space": "Spotlight搜索",
+            "Command+Tab": "应用切换",
+            "Command+Q": "退出应用",
+            "Command+W": "关闭窗口",
+            "Command+C": "复制",
+            "Command+V": "粘贴",
+            "Command+X": "剪切",
+            "Command+Z": "撤销",
+            "Command+Shift+3": "截屏(全屏)",
+            "Command+Shift+4": "截屏(区域)",
+            "Command+Shift+5": "截屏工具",
+        }
+        
+        normalized_shortcut = shortcut.replace(" ", "")
+        
+        if normalized_shortcut in common_shortcuts:
+            return {
+                "has_conflict": True,
+                "shortcut": shortcut,
+                "conflicts_with": common_shortcuts[normalized_shortcut],
+                "suggestion": f"建议使用 {shortcut}+Shift 或其他组合"
+            }
+        else:
+            return {
+                "has_conflict": False,
+                "shortcut": shortcut,
+                "note": "未发现与常见系统快捷键冲突,但建议在设置前测试"
+            }
+    
     def __repr__(self) -> str:
         """返回控制器的字符串表示"""
         return f"MacController(macos={self.is_macos}, version={self.get_macos_version() if self.is_macos else 'N/A'})"
