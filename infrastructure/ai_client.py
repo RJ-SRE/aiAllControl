@@ -39,6 +39,7 @@ from typing import Dict
 from abc import ABC, abstractmethod
 from infrastructure.config import config
 from infrastructure.logger import logger
+from domain.exceptions import AIError, ConfigError
 
 
 class AIClient(ABC):
@@ -106,9 +107,12 @@ class QiniuClient(AIClient):
             import openai
             self.client = openai.OpenAI(api_key=api_key, base_url=base_url)
             self.model = model
-            logger.info(f"七牛云AI客户端初始化成功 - 端点: {base_url}, 模型: {model}")
+            logger.debug(f"七牛云AI客户端初始化成功 - 端点: {base_url}, 模型: {model}")
         except ImportError:
-            raise RuntimeError("请安装OpenAI库: pip install openai")
+            raise ConfigError(
+                "OpenAI库未安装",
+                detail="请运行: pip install openai"
+            )
     
     def analyze_intent(self, user_input: str) -> Dict[str, str]:
         """
@@ -160,7 +164,7 @@ class QiniuClient(AIClient):
 """
         
         try:
-            logger.info(f"调用七牛云大模型分析用户意图: {user_input}")
+            logger.debug(f"调用七牛云大模型分析用户意图: {user_input}")
             
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -171,66 +175,52 @@ class QiniuClient(AIClient):
             import json
             result = json.loads(response.choices[0].message.content)
             
-            logger.info(f"七牛云AI分析成功: {result}")
+            logger.debug(f"七牛云AI分析成功: {result}")
             
             return result
             
         except Exception as e:
             logger.error(f"七牛云AI调用失败: {e}", exc_info=True)
-            raise RuntimeError(f"AI模型推理失败,程序停止执行: {e}")
+            raise AIError(
+                "AI模型推理失败",
+                detail=str(e),
+                context={'model': self.model, 'input': user_input[:50]}
+            )
 
 
-def create_ai_client(use_mcp: bool = None) -> AIClient:
+def create_ai_client() -> AIClient:
     """
-    工厂函数 - 创建AI客户端(支持MCP模式)
-    
-    参数:
-        use_mcp: 是否使用MCP客户端(None=从配置读取, True=强制MCP, False=直接调用)
+    工厂函数 - 创建AI客户端
     
     返回:
-        AIClient: AI客户端实例(MCP或直接调用)
+        AIClient: 七牛云AI客户端实例
     
     抛出:
-        RuntimeError: API密钥未配置
+        ConfigError: API密钥未配置
     
     设计模式: 工厂模式
-        根据配置创建MCP客户端或直接调用客户端。
+        简化的工厂函数,统一使用七牛云AI客户端。
     
     配置说明:
-        - use_mcp: 是否使用MCP协议(默认: true)
         - qiniu_api_key: 七牛云 API 密钥(从环境变量或配置文件读取)
         - qiniu_base_url: 七牛云 API 端点 URL(可选,默认: https://openai.qiniu.com/v1)
         - qiniu_model: 使用的模型名称(可选,默认: gpt-4)
     
     示例:
-        # 创建MCP客户端(推荐)
-        client = create_ai_client()  # 从配置读取
-        client = create_ai_client(use_mcp=True)  # 强制使用MCP
-        
-        # 创建直接调用客户端(兼容模式)
-        client = create_ai_client(use_mcp=False)
+        # 创建AI客户端
+        client = create_ai_client()
+        result = client.analyze_intent("帮我找一个绘图软件")
     """
     api_key = config.get('qiniu_api_key')
     if not api_key:
-        raise RuntimeError(
-            "未配置七牛云 API Key,请在配置文件 ~/.macmind/config.json 中设置 qiniu_api_key,\n"
-            "或设置环境变量 QINIU_API_KEY。\n"
-            "获取方式: https://developer.qiniu.com/aitokenapi/12884/how-to-get-api-key"
+        raise ConfigError(
+            "未配置七牛云 API Key",
+            detail="请在配置文件 ~/.macmind/config.json 中设置 qiniu_api_key,或设置环境变量 QINIU_API_KEY",
+            context={'config_url': 'https://developer.qiniu.com/aitokenapi/12884/how-to-get-api-key'}
         )
     
     base_url = config.get('qiniu_base_url', 'https://openai.qiniu.com/v1')
     model = config.get('qiniu_model', 'gpt-4')
     
-    # 决定使用哪种客户端
-    if use_mcp is None:
-        use_mcp = config.get('use_mcp', True)  # 默认使用MCP
-    
-    if use_mcp:
-        # 使用MCP客户端
-        from infrastructure.mcp_client import create_mcp_client
-        logger.info("使用MCP客户端模式")
-        return create_mcp_client(api_key, base_url, model)
-    else:
-        # 使用直接调用模式(向后兼容)
-        logger.info("使用直接调用模式")
-        return QiniuClient(api_key, base_url, model)
+    logger.info(f"创建七牛云AI客户端 - 模型: {model}")
+    return QiniuClient(api_key, base_url, model)

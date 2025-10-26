@@ -328,13 +328,15 @@ class PackageService:
         try:
             logger.info(f"正在卸载 {package_name}...")
             
-            brew._execute(['uninstall', package_name])
+            success = brew.uninstall(package_name)
             
-            logger.info(f"卸载成功: {package_name}")
-            
-            self.repository.refresh_installed_cache()
-            
-            return True
+            if success:
+                logger.info(f"卸载成功: {package_name}")
+                self.repository.refresh_installed_cache()
+                return True
+            else:
+                logger.error(f"卸载失败: {package_name}")
+                return False
             
         except Exception as e:
             logger.error(f"卸载失败: {e}", exc_info=True)
