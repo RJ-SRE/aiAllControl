@@ -8,9 +8,14 @@
 ## 🧩 项目简介
 
 **MacMind** 是一个运行于 macOS 的 AI 系统控制框架。  
-它基于 **MCP（Model-Controlled Process）** 理念，  
+通过集成七牛云大模型推理服务，MacMind 能够：
+- 理解自然语言指令
+- 自动搜索和推荐软件
+- 控制 macOS 应用程序
+- 管理系统通知和快捷键
+
 让 AI 不再依赖硬编码逻辑，而是通过自然语言指令，  
-自动生成操作计划、执行系统命令、管理权限，并持续学习用户偏好。
+自动生成操作计划、执行系统命令，并持续学习用户偏好。
 
 你只需告诉它：
 > "帮我装个绘图软件"  
@@ -181,16 +186,15 @@ tell application "WPS" to activate
 
 ### 技术栈
 ```yaml
-后端框架: Python/Node.js
-LLM 集成: Anthropic Claude API / OpenAI GPT API
+后端框架: Python 3.8+
+LLM 集成: 七牛云大模型推理服务 (OpenAI 兼容接口)
 macOS 自动化: 
   - osascript (AppleScript)
   - Hammerspoon (快捷键管理)
   - subprocess (执行 shell 命令)
 包管理: Homebrew
-前端界面: 
-  - CLI (命令行)
-  - 或菜单栏应用 (Swift/Electron)
+前端界面: CLI (命令行)
+架构设计: DDD (领域驱动设计) + Repository 模式
 ```
 
 ### 开发阶段

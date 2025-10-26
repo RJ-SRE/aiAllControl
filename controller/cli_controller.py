@@ -418,19 +418,19 @@ class CLIController:
                 context = conversation_manager.get_context()
                 
                 try:
-                    response_text = "抱歉，我暂时无法理解这个请求。请尝试询问软件搜索、安装等相关问题。"
-                    
-                    import json
                     response = ai_client.client.chat.completions.create(
                         model=ai_client.model,
                         messages=context
                     )
                     
+                    if not response.choices or not response.choices[0].message.content:
+                        raise ValueError("AI响应格式无效")
+                    
                     response_text = response.choices[0].message.content
                     
                 except Exception as e:
                     logger.error(f"AI响应失败: {e}", exc_info=True)
-                    response_text = f"抱歉，AI服务暂时不可用: {str(e)}"
+                    response_text = f"抱歉，AI服务暂时不可用: {str(e)}\n\n请检查:\n1. API密钥是否配置正确\n2. 网络连接是否正常\n3. API配额是否充足"
                 
                 print(response_text)
                 print()
