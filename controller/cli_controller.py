@@ -10,6 +10,9 @@ from typing import Optional, List
 from service.package_service import PackageService
 from domain.package import Package
 from infrastructure.logger import logger
+from infrastructure.conversation import conversation_manager
+from infrastructure.mac_controller import MacController
+from infrastructure.ai_client import create_ai_client
 
 
 class CLIController:
@@ -28,6 +31,8 @@ class CLIController:
         - uninstall <package>: 卸载软件包
         - list: 列出已安装的软件包
         - info <package>: 显示软件包详细信息
+        - chat: 进入交互式对话模式
+        - mac <action> [args]: Mac系统控制
         - clear-cache: 清空缓存
         - help: 显示帮助信息
     
@@ -44,6 +49,7 @@ class CLIController:
             - PackageService: 业务逻辑层服务
         """
         self.service = PackageService()
+        self.mac_controller = MacController()
         logger.debug("CLIController初始化完成")
     
     def run(self, args: Optional[List[str]] = None):
@@ -83,6 +89,10 @@ class CLIController:
                 self._handle_list(params)
             elif command == 'info':
                 self._handle_info(params)
+            elif command == 'chat':
+                self._handle_chat(params)
+            elif command == 'mac':
+                self._handle_mac(params)
             elif command == 'clear-cache':
                 self._handle_clear_cache(params)
             elif command == 'help' or command == '--help' or command == '-h':
@@ -342,6 +352,171 @@ class CLIController:
         self.service.clear_cache()
         print("✅ 缓存已清空")
     
+    def _handle_chat(self, params: List[str]):
+        """
+        处理交互式对话命令
+        
+        参数:
+            params: 可选参数（暂未使用）
+        
+        命令格式:
+            chat
+        
+        功能:
+            进入交互式AI对话模式，支持持续对话和上下文记忆
+        
+        示例:
+            chat
+        """
+        print("💬 进入交互式对话模式")
+        print("提示: 输入 'exit' 或 'quit' 退出对话")
+        print("提示: 输入 'clear' 清空对话历史")
+        print("提示: 输入 'save' 保存当前会话")
+        print("=" * 60)
+        print()
+        
+        try:
+            ai_client = create_ai_client()
+        except Exception as e:
+            print(f"❌ AI客户端初始化失败: {e}")
+            print("请检查API密钥配置")
+            return
+        
+        conversation_manager.add_system_message(
+            "你是MacMind的AI助手，专门帮助用户管理Mac软件和系统。"
+            "你可以搜索软件、安装软件、控制Mac应用等。"
+        )
+        
+        while True:
+            try:
+                user_input = input("😊 你: ").strip()
+                
+                if not user_input:
+                    continue
+                
+                if user_input.lower() in ['exit', 'quit', 'q']:
+                    print("\n👋 再见！")
+                    break
+                
+                if user_input.lower() == 'clear':
+                    conversation_manager.clear_history()
+                    print("✅ 对话历史已清空\n")
+                    continue
+                
+                if user_input.lower() == 'save':
+                    conversation_manager.save_session()
+                    print("✅ 会话已保存\n")
+                    continue
+                
+                conversation_manager.add_user_message(user_input)
+                
+                print("🤖 AI: ", end="", flush=True)
+                
+                context = conversation_manager.get_context()
+                
+                try:
+                    response_text = "抱歉，我暂时无法理解这个请求。请尝试询问软件搜索、安装等相关问题。"
+                    
+                    import json
+                    response = ai_client.client.chat.completions.create(
+                        model=ai_client.model,
+                        messages=context
+                    )
+                    
+                    response_text = response.choices[0].message.content
+                    
+                except Exception as e:
+                    logger.error(f"AI响应失败: {e}", exc_info=True)
+                    response_text = f"抱歉，AI服务暂时不可用: {str(e)}"
+                
+                print(response_text)
+                print()
+                
+                conversation_manager.add_assistant_message(response_text)
+                
+            except KeyboardInterrupt:
+                print("\n\n👋 对话已中断")
+                break
+            except Exception as e:
+                logger.error(f"对话处理错误: {e}", exc_info=True)
+                print(f"\n❌ 错误: {e}\n")
+    
+    def _handle_mac(self, params: List[str]):
+        """
+        处理Mac系统控制命令
+        
+        参数:
+            params: 子命令和参数
+        
+        命令格式:
+            mac open <app>        打开应用
+            mac quit <app>        关闭应用
+            mac status <app>      查询应用状态
+            mac apps              列出运行中的应用
+            mac version           显示macOS版本
+        
+        示例:
+            mac open Safari
+            mac quit "网易云音乐"
+            mac status Safari
+        """
+        if not params:
+            print("❌ 请提供Mac控制子命令")
+            print("用法: mac <action> [args]")
+            print("可用操作: open, quit, status, apps, version")
+            return
+        
+        action = params[0].lower()
+        args = params[1:]
+        
+        try:
+            if action == 'open':
+                if not args:
+                    print("❌ 请提供应用名称")
+                    print("用法: mac open <app>")
+                    return
+                app_name = ' '.join(args)
+                self.mac_controller.open_app(app_name)
+                print(f"✅ 已打开应用: {app_name}")
+            
+            elif action == 'quit':
+                if not args:
+                    print("❌ 请提供应用名称")
+                    print("用法: mac quit <app>")
+                    return
+                app_name = ' '.join(args)
+                self.mac_controller.quit_app(app_name)
+                print(f"✅ 已关闭应用: {app_name}")
+            
+            elif action == 'status':
+                if not args:
+                    print("❌ 请提供应用名称")
+                    print("用法: mac status <app>")
+                    return
+                app_name = ' '.join(args)
+                is_running = self.mac_controller.is_app_running(app_name)
+                status = "运行中 ✓" if is_running else "未运行 ✗"
+                print(f"应用状态: {app_name} - {status}")
+            
+            elif action == 'apps':
+                apps = self.mac_controller.get_running_apps()
+                print(f"📱 运行中的应用 (共{len(apps)}个):")
+                print()
+                for i, app in enumerate(apps, 1):
+                    print(f"{i}. {app}")
+            
+            elif action == 'version':
+                version = self.mac_controller.get_macos_version()
+                print(f"🍎 macOS版本: {version}")
+            
+            else:
+                print(f"❌ 未知操作: {action}")
+                print("可用操作: open, quit, status, apps, version")
+        
+        except Exception as e:
+            logger.error(f"Mac控制操作失败: {e}", exc_info=True)
+            print(f"❌ 操作失败: {e}")
+    
     def _print_package_summary(self, package: Package, index: Optional[int] = None):
         """
         打印软件包摘要信息
@@ -456,6 +631,14 @@ class CLIController:
     info <package>        显示软件包详细信息
                           示例: macmind info vim
     
+    chat                  进入交互式AI对话模式
+                          示例: macmind chat
+                          功能: 持续对话、上下文记忆、会话保存
+    
+    mac <action> [args]   Mac系统控制
+                          示例: macmind mac open Safari
+                          操作: open, quit, status, apps, version
+    
     clear-cache           清空所有缓存
                           示例: macmind clear-cache
     
@@ -474,6 +657,15 @@ class CLIController:
     
     # 查看 vim 的详细信息
     macmind info vim
+    
+    # 进入AI对话模式
+    macmind chat
+    
+    # 打开Safari浏览器
+    macmind mac open Safari
+    
+    # 查询应用运行状态
+    macmind mac status Safari
     
     # 卸载 drawio
     macmind uninstall drawio
