@@ -42,6 +42,7 @@ import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import json
+from domain.exceptions import ConfigError
 
 
 class Config:
@@ -148,10 +149,13 @@ class Config:
                     file_config = json.load(f)
                     # 更新默认配置（不覆盖，只补充/更新已有键）
                     self._config.update(file_config)
-            except (json.JSONDecodeError, IOError) as e:
-                # 配置文件损坏时使用默认配置
-                # 这里可以记录错误日志，但不导入logger避免循环依赖
-                pass
+            except json.JSONDecodeError as e:
+                # 配置文件格式错误时使用默认配置
+                # 注意: 这里不能使用logger避免循环依赖，在validate()中会检查
+                print(f"警告: 配置文件格式错误 ({self.config_file}): {e}，将使用默认配置")
+            except IOError as e:
+                # 读取配置文件失败
+                print(f"警告: 读取配置文件失败 ({self.config_file}): {e}，将使用默认配置")
         
         # 步骤3: 从环境变量加载API密钥
         # 环境变量优先级最高，覆盖配置文件
@@ -240,6 +244,7 @@ class Config:
         验证项:
         1. API密钥必须存在
         2. Homebrew路径必须存在且可执行
+        3. 配置值范围检查
         
         使用场景:
             在应用启动时验证配置，避免运行时错误
@@ -249,13 +254,32 @@ class Config:
                 print("配置不完整，请设置API密钥")
                 sys.exit(1)
         """
+        errors = []
+        
         # 验证1: 检查七牛云API密钥
         if not self._config.get('qiniu_api_key'):
-            return False
+            errors.append("缺少七牛云API密钥 (qiniu_api_key)")
         
         # 验证2: 检查Homebrew路径
         homebrew_path = Path(self._config['homebrew_path'])
         if not homebrew_path.exists():
+            errors.append(f"Homebrew路径不存在: {homebrew_path}")
+        elif not os.access(homebrew_path, os.X_OK):
+            errors.append(f"Homebrew路径不可执行: {homebrew_path}")
+        
+        # 验证3: 检查配置值范围
+        max_results = self._config.get('max_search_results', 5)
+        if not isinstance(max_results, int) or not 1 <= max_results <= 20:
+            errors.append(f"max_search_results必须在1-20之间: {max_results}")
+        
+        cache_ttl = self._config.get('cache_ttl', 3600)
+        if not isinstance(cache_ttl, int) or cache_ttl < 0:
+            errors.append(f"cache_ttl必须为非负整数: {cache_ttl}")
+        
+        # 如果有错误，记录并返回False
+        if errors:
+            for error in errors:
+                print(f"配置验证失败: {error}")
             return False
         
         # 所有验证通过
