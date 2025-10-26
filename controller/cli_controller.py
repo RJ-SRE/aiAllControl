@@ -93,6 +93,10 @@ class CLIController:
                 self._handle_chat(params)
             elif command == 'mac':
                 self._handle_mac(params)
+            elif command == 'notification':
+                self._handle_notification(params)
+            elif command == 'shortcut':
+                self._handle_shortcut(params)
             elif command == 'clear-cache':
                 self._handle_clear_cache(params)
             elif command == 'help' or command == '--help' or command == '-h':
@@ -383,8 +387,7 @@ class CLIController:
             return
         
         conversation_manager.add_system_message(
-            "你是MacMind的AI助手，专门帮助用户管理Mac软件和系统。"
-            "你可以搜索软件、安装软件、控制Mac应用等。"
+            conversation_manager.get_optimized_system_prompt()
         )
         
         while True:
@@ -454,6 +457,7 @@ class CLIController:
             mac status <app>      查询应用状态
             mac apps              列出运行中的应用
             mac version           显示macOS版本
+            mac notify <title> <message>  发送系统通知
         
         示例:
             mac open Safari
@@ -509,9 +513,20 @@ class CLIController:
                 version = self.mac_controller.get_macos_version()
                 print(f"🍎 macOS版本: {version}")
             
+            elif action == 'notify':
+                if len(args) < 2:
+                    print("❌ 请提供通知标题和内容")
+                    print("用法: mac notify <title> <message> [subtitle]")
+                    return
+                title = args[0]
+                message = args[1]
+                subtitle = args[2] if len(args) > 2 else None
+                self.mac_controller.send_notification(title, message, subtitle)
+                print(f"✅ 已发送通知")
+            
             else:
                 print(f"❌ 未知操作: {action}")
-                print("可用操作: open, quit, status, apps, version")
+                print("可用操作: open, quit, status, apps, version, notify")
         
         except Exception as e:
             logger.error(f"Mac控制操作失败: {e}", exc_info=True)
@@ -601,6 +616,158 @@ class CLIController:
             else:
                 print("请输入 y 或 n")
     
+    def _handle_notification(self, params: List[str]):
+        """
+        处理通知管理命令
+        
+        参数:
+            params: 子命令和参数
+        
+        命令格式:
+            notification enable <app>     启用应用通知
+            notification disable <app>    禁用应用通知
+            notification info <app>       查看通知设置
+            notification send <title> <message> [副标题]  发送通知
+        """
+        if not params:
+            print("❌ 请提供通知管理子命令")
+            print("用法: notification <action> [args]")
+            print("可用操作: enable, disable, info, send")
+            return
+        
+        action = params[0].lower()
+        args = params[1:]
+        
+        try:
+            if action == 'enable':
+                if not args:
+                    print("❌ 请提供应用名称")
+                    print("用法: notification enable <app>")
+                    return
+                app_name = ' '.join(args)
+                guide = self.mac_controller.enable_app_notifications(app_name)
+                print(guide)
+            
+            elif action == 'disable':
+                if not args:
+                    print("❌ 请提供应用名称")
+                    print("用法: notification disable <app>")
+                    return
+                app_name = ' '.join(args)
+                guide = self.mac_controller.disable_app_notifications(app_name)
+                print(guide)
+            
+            elif action == 'info':
+                if not args:
+                    print("❌ 请提供应用名称")
+                    print("用法: notification info <app>")
+                    return
+                app_name = ' '.join(args)
+                settings = self.mac_controller.get_notification_settings(app_name)
+                if settings:
+                    print(f"🔔 {settings['app_name']} 通知设置")
+                    print(f"Bundle ID: {settings['bundle_id']}")
+                    print(f"设置路径: {settings['settings_path']}")
+                    print(f"注意: {settings['note']}")
+                else:
+                    print(f"❌ 无法获取通知设置: {app_name}")
+            
+            elif action == 'send':
+                if len(args) < 2:
+                    print("❌ 请提供通知标题和内容")
+                    print("用法: notification send <title> <message> [subtitle]")
+                    return
+                title = args[0]
+                message = args[1]
+                subtitle = args[2] if len(args) > 2 else None
+                success = self.mac_controller.send_notification(title, message, subtitle)
+                if success:
+                    print("✅ 通知已发送")
+                else:
+                    print("❌ 通知发送失败")
+            
+            else:
+                print(f"❌ 未知操作: {action}")
+                print("可用操作: enable, disable, info, send")
+        
+        except Exception as e:
+            logger.error(f"通知管理操作失败: {e}", exc_info=True)
+            print(f"❌ 操作失败: {e}")
+    
+    def _handle_shortcut(self, params: List[str]):
+        """
+        处理快捷键管理命令
+        
+        参数:
+            params: 子命令和参数
+        
+        命令格式:
+            shortcut create <快捷键> <操作> [app1] [app2] ...  创建快捷键
+            shortcut check <快捷键>                        检查冲突
+            shortcut install-tool                         安装Hammerspoon
+        """
+        if not params:
+            print("❌ 请提供快捷键管理子命令")
+            print("用法: shortcut <action> [args]")
+            print("可用操作: create, check, install-tool")
+            return
+        
+        action = params[0].lower()
+        args = params[1:]
+        
+        try:
+            if action == 'create':
+                if len(args) < 2:
+                    print("❌ 请提供快捷键和操作描述")
+                    print("用法: shortcut create <快捷键> <操作> [app1] [app2] ...")
+                    print("示例: shortcut create 'Command+Shift+L' '打开工作应用' '企业微信' 'WPS'")
+                    return
+                
+                shortcut = args[0]
+                action_desc = args[1]
+                apps = args[2:] if len(args) > 2 else None
+                
+                guide = self.mac_controller.create_keyboard_shortcut_guide(
+                    shortcut, action_desc, apps
+                )
+                print(guide)
+            
+            elif action == 'check':
+                if not args:
+                    print("❌ 请提供要检查的快捷键")
+                    print("用法: shortcut check <快捷键>")
+                    print("示例: shortcut check 'Command+L'")
+                    return
+                
+                shortcut = args[0]
+                result = self.mac_controller.check_keyboard_shortcut_conflicts(shortcut)
+                
+                if result['has_conflict']:
+                    print(f"⚠️  快捷键冲突检测")
+                    print(f"快捷键: {result['shortcut']}")
+                    print(f"冲突项: {result['conflicts_with']}")
+                    print(f"💡 {result['suggestion']}")
+                else:
+                    print(f"✅ 未发现冲突")
+                    print(f"快捷键: {result['shortcut']}")
+                    print(f"注意: {result['note']}")
+            
+            elif action == 'install-tool':
+                print("🔧 准备安装 Hammerspoon...")
+                print("")
+                success = self.mac_controller.install_hammerspoon()
+                if not success:
+                    print("\n或者手动安装:")
+                    print("brew install hammerspoon --cask")
+            
+            else:
+                print(f"❌ 未知操作: {action}")
+                print("可用操作: create, check, install-tool")
+        
+        except Exception as e:
+            logger.error(f"快捷键管理操作失败: {e}", exc_info=True)
+            print(f"❌ 操作失败: {e}")
+    
     def _show_help(self):
         """
         显示帮助信息
@@ -637,7 +804,15 @@ class CLIController:
     
     mac <action> [args]   Mac系统控制
                           示例: macmind mac open Safari
-                          操作: open, quit, status, apps, version
+                          操作: open, quit, status, apps, version, notify
+    
+    notification <action> 通知管理
+                          示例: macmind notification disable Safari
+                          操作: enable, disable, info, send
+    
+    shortcut <action>     快捷键管理
+                          示例: macmind shortcut create 'Command+L' '打开应用'
+                          操作: create, check, install-tool
     
     clear-cache           清空所有缓存
                           示例: macmind clear-cache
@@ -666,6 +841,12 @@ class CLIController:
     
     # 查询应用运行状态
     macmind mac status Safari
+    
+    # 禁用应用通知
+    macmind notification disable Safari
+    
+    # 创建快捷键
+    macmind shortcut create 'Command+Shift+L' '打开工作应用' '企业微信' 'WPS'
     
     # 卸载 drawio
     macmind uninstall drawio

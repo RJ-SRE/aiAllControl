@@ -250,6 +250,217 @@ class TestEndToEndFlow:
             assert pkg.name in ['vim', 'emacs']
 
 
+class TestNotificationIntegration:
+    """
+    通知管理集成测试
+    
+    测试通知相关功能的完整流程
+    """
+    
+    @patch('infrastructure.mac_controller.platform.system')
+    @patch('infrastructure.mac_controller.subprocess.run')
+    def test_notification_send_flow(self, mock_run, mock_system):
+        """
+        测试发送通知流程
+        """
+        mock_system.return_value = 'Darwin'
+        mock_result = Mock()
+        mock_result.stdout = ''
+        mock_result.stderr = ''
+        mock_run.return_value = mock_result
+        
+        controller = MacController()
+        success = controller.send_notification(
+            "测试标题",
+            "测试消息",
+            subtitle="测试副标题"
+        )
+        
+        assert success == True
+        mock_run.assert_called()
+    
+    @patch('infrastructure.mac_controller.platform.system')
+    def test_notification_settings_guide(self, mock_system):
+        """
+        测试通知设置引导流程
+        """
+        mock_system.return_value = 'Darwin'
+        
+        controller = MacController()
+        guide = controller.enable_app_notifications("Safari")
+        
+        assert "Safari" in guide
+        assert "通知" in guide
+        assert "步骤" in guide
+
+
+class TestShortcutIntegration:
+    """
+    快捷键管理集成测试
+    
+    测试快捷键相关功能的完整流程
+    """
+    
+    @patch('infrastructure.mac_controller.platform.system')
+    def test_shortcut_guide_generation(self, mock_system):
+        """
+        测试快捷键引导生成
+        """
+        mock_system.return_value = 'Darwin'
+        
+        controller = MacController()
+        guide = controller.create_keyboard_shortcut_guide(
+            "Command+Shift+L",
+            "打开工作应用",
+            ["企业微信", "WPS"]
+        )
+        
+        assert "Command+Shift+L" in guide
+        assert "打开工作应用" in guide
+        assert "企业微信" in guide
+        assert "WPS" in guide
+        assert "Automator" in guide or "Hammerspoon" in guide
+    
+    @patch('infrastructure.mac_controller.platform.system')
+    def test_shortcut_conflict_check(self, mock_system):
+        """
+        测试快捷键冲突检查
+        """
+        mock_system.return_value = 'Darwin'
+        
+        controller = MacController()
+        
+        result = controller.check_keyboard_shortcut_conflicts("Command+L")
+        assert result['has_conflict'] == True
+        assert "锁定屏幕" in result['conflicts_with']
+        
+        result = controller.check_keyboard_shortcut_conflicts("Command+Shift+L")
+        assert result['has_conflict'] == False
+
+
+class TestConversationPromptIntegration:
+    """
+    对话提示词集成测试
+    
+    测试优化后的提示词功能
+    """
+    
+    def test_optimized_prompt_generation(self):
+        """
+        测试优化后的系统提示词生成
+        """
+        manager = ConversationManager()
+        prompt = manager.get_optimized_system_prompt()
+        
+        assert "MacMind" in prompt
+        assert "软件管理" in prompt
+        assert "系统控制" in prompt
+        assert "通知" in prompt
+        assert "快捷键" in prompt
+    
+    def test_context_with_summary(self, tmp_path):
+        """
+        测试带总结的上下文生成
+        """
+        manager = ConversationManager()
+        manager.session_dir = tmp_path
+        manager.clear_history()
+        
+        for i in range(10):
+            manager.add_user_message(f"搜索软件 {i}")
+            manager.add_assistant_message(f"找到软件 {i}")
+        
+        context = manager.get_context_with_summary(max_messages=5)
+        
+        assert len(context) > 0
+        assert any("总结" in msg.get("content", "") for msg in context)
+    
+    def test_topic_extraction(self, tmp_path):
+        """
+        测试主题提取功能
+        """
+        manager = ConversationManager()
+        manager.session_dir = tmp_path
+        manager.clear_history()
+        
+        manager.add_user_message("帮我搜索绘图软件")
+        manager.add_user_message("打开Safari")
+        manager.add_user_message("关闭通知")
+        
+        messages = manager.get_context()
+        topics = manager._extract_topics(messages)
+        
+        assert "软件" in topics or "系统控制" in topics or "通知管理" in topics
+
+
+class TestAdvancedIntegrationScenarios:
+    """
+    高级集成测试场景
+    
+    测试复杂的业务流程组合
+    """
+    
+    @patch('infrastructure.brew_executor.brew')
+    @patch('infrastructure.mac_controller.subprocess.run')
+    @patch('infrastructure.mac_controller.platform.system')
+    def test_install_and_notify_flow(self, mock_system, mock_subprocess, mock_brew):
+        """
+        测试安装软件后发送通知的完整流程
+        """
+        mock_system.return_value = 'Darwin'
+        mock_subprocess_result = Mock()
+        mock_subprocess_result.stdout = ''
+        mock_subprocess_result.stderr = ''
+        mock_subprocess.return_value = mock_subprocess_result
+        
+        mock_brew.search.return_value = ['drawio']
+        mock_brew.info.return_value = {
+            'name': 'drawio',
+            'desc': 'Diagram editor',
+            'version': '21.0.0',
+            'license': 'Apache-2.0'
+        }
+        mock_brew.install.return_value = True
+        
+        service = PackageService()
+        mac_controller = MacController()
+        
+        success = service.install_package('drawio')
+        assert success == True
+        
+        notification_sent = mac_controller.send_notification(
+            "MacMind",
+            "软件安装完成",
+            subtitle="drawio 已成功安装"
+        )
+        assert notification_sent == True
+    
+    @patch('infrastructure.mac_controller.platform.system')
+    def test_conversation_with_context(self, mock_system, tmp_path):
+        """
+        测试带上下文的多轮对话流程
+        """
+        mock_system.return_value = 'Darwin'
+        
+        manager = ConversationManager()
+        manager.session_dir = tmp_path
+        manager.clear_history()
+        
+        manager.add_user_message("帮我找一个绘图软件")
+        manager.add_assistant_message("我推荐drawio")
+        manager.add_context_message("用户对drawio感兴趣")
+        manager.add_user_message("如何安装")
+        manager.add_assistant_message("执行 brew install drawio")
+        
+        context = manager.get_context()
+        
+        assert len(context) == 5
+        assert any("[上下文]" in msg.get("content", "") for msg in context)
+        
+        turns = manager.get_conversation_turns()
+        assert turns == 2
+
+
 @pytest.fixture
 def temp_session_dir(tmp_path):
     """提供临时会话目录"""
