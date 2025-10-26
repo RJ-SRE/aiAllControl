@@ -40,7 +40,7 @@ Mac系统控制模块 - Mac Controller
 
 import subprocess
 import platform
-from typing import Optional, List
+from typing import Optional, List, Dict
 from infrastructure.logger import logger
 from domain.exceptions import MacControlError
 
