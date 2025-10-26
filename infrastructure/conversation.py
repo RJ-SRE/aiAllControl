@@ -38,7 +38,7 @@
 
 import json
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 from infrastructure.logger import logger
 from domain.exceptions import ConversationError
@@ -171,7 +171,7 @@ class ConversationManager:
         """
         self.add_message("system", content)
     
-    def get_context(self, max_messages: Optional[int] = None) -> List[Dict[str, str]]:
+    def get_context(self, max_messages: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         获取对话上下文(用于AI调用)
         
@@ -185,6 +185,7 @@ class ConversationManager:
             - 返回格式符合OpenAI API要求
             - 移除timestamp字段(仅内部使用)
             - 可限制消息数量以控制token使用
+            - 支持工具调用消息(tool_calls和tool角色)
         
         示例:
             context = manager.get_context(max_messages=10)
@@ -192,10 +193,28 @@ class ConversationManager:
         """
         messages = self.history if max_messages is None else self.history[-max_messages:]
         
-        return [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in messages
-        ]
+        result = []
+        for msg in messages:
+            if msg["role"] == "tool":
+                result.append({
+                    "role": msg["role"],
+                    "tool_call_id": msg["tool_call_id"],
+                    "name": msg["name"],
+                    "content": msg["content"]
+                })
+            elif "tool_calls" in msg:
+                result.append({
+                    "role": msg["role"],
+                    "content": msg["content"],
+                    "tool_calls": msg["tool_calls"]
+                })
+            else:
+                result.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+        
+        return result
     
     def get_last_messages(self, count: int = 5) -> List[Dict[str, str]]:
         """
@@ -600,6 +619,66 @@ class ConversationManager:
             manager.add_context_message("用户刚安装了 drawio")
         """
         self.add_system_message(f"[上下文] {message}")
+    
+    def add_tool_call_message(self, tool_calls: List[Dict[str, Any]]):
+        """
+        添加AI的工具调用消息
+        
+        参数:
+            tool_calls: 工具调用列表,每个包含id, type, function等信息
+        
+        说明:
+            当AI决定调用工具时,记录这些调用请求
+        
+        示例:
+            manager.add_tool_call_message([
+                {
+                    "id": "call_123",
+                    "type": "function",
+                    "function": {
+                        "name": "search_software",
+                        "arguments": '{"query": "vim"}'
+                    }
+                }
+            ])
+        """
+        message = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": tool_calls,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.history.append(message)
+        logger.debug(f"添加工具调用消息,调用数: {len(tool_calls)}")
+    
+    def add_tool_result_message(self, tool_call_id: str, function_name: str, result: str):
+        """
+        添加工具执行结果消息
+        
+        参数:
+            tool_call_id: 工具调用ID
+            function_name: 函数名称
+            result: 执行结果(JSON字符串)
+        
+        说明:
+            将工具的执行结果反馈给AI
+        
+        示例:
+            manager.add_tool_result_message(
+                "call_123",
+                "search_software",
+                '{"success": true, "data": {...}}'
+            )
+        """
+        message = {
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "name": function_name,
+            "content": result,
+            "timestamp": datetime.now().isoformat()
+        }
+        self.history.append(message)
+        logger.debug(f"添加工具结果消息: {function_name}")
     
     def __repr__(self) -> str:
         """返回会话管理器的字符串表示"""
