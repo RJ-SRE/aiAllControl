@@ -37,6 +37,7 @@ import json
 from typing import List, Dict, Any
 from infrastructure.logger import logger
 from infrastructure.config import config
+from domain.exceptions import BrewError
 
 
 class BrewExecutor:
@@ -111,13 +112,31 @@ class BrewExecutor:
             # CalledProcessError: 命令返回非零退出码
             error_msg = f"命令执行失败: {e.stderr}"
             logger.error(error_msg)
-            raise RuntimeError(f"Homebrew命令失败: {e.stderr}")
+            raise BrewError(
+                "Homebrew命令执行失败",
+                detail=e.stderr,
+                context={'command': ' '.join(args), 'exit_code': e.returncode}
+            )
             
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             # 步骤4b: 处理超时
             error_msg = f"命令执行超时: {' '.join(cmd)}"
             logger.error(error_msg)
-            raise RuntimeError("命令执行超时")
+            raise BrewError(
+                "命令执行超时",
+                detail=f"超时时间: {timeout}秒",
+                context={'command': ' '.join(args), 'timeout': timeout}
+            )
+        
+        except Exception as e:
+            # 步骤4c: 处理其他异常(如权限错误、文件不存在等)
+            error_msg = f"命令执行异常: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise BrewError(
+                "Homebrew命令执行异常",
+                detail=str(e),
+                context={'command': ' '.join(args)}
+            )
     
     def search(self, keyword: str) -> List[str]:
         """
@@ -209,7 +228,11 @@ class BrewExecutor:
             return data['casks'][0]
         else:
             # 包不存在
-            raise RuntimeError(f"未找到包: {package}")
+            raise BrewError(
+                "软件包不存在",
+                detail=f"在Homebrew中未找到软件包: {package}",
+                context={'package': package}
+            )
     
     def install(self, package: str, is_cask: bool = False) -> bool:
         """
@@ -254,7 +277,7 @@ class BrewExecutor:
             logger.info(f"成功安装: {package}")
             return True
             
-        except RuntimeError as e:
+        except BrewError as e:
             # 安装失败
             logger.error(f"安装失败: {e}")
             return False
@@ -292,6 +315,40 @@ class BrewExecutor:
         logger.debug(f"已安装{len(packages)}个包")
         
         return packages
+    
+    def uninstall(self, package: str) -> bool:
+        """
+        卸载软件包
+        
+        参数:
+            package: 包名
+        
+        返回:
+            bool: 卸载是否成功
+        
+        说明:
+            执行 brew uninstall <package> 命令。
+        
+        超时设置:
+            卸载命令通常很快,设置60秒超时。
+        
+        示例:
+            success = brew.uninstall('drawio')
+            if success:
+                print("卸载成功")
+        """
+        try:
+            logger.info(f"正在卸载: {package}")
+            
+            # 执行卸载命令
+            self._execute(['uninstall', package], timeout=60)
+            
+            logger.info(f"成功卸载: {package}")
+            return True
+            
+        except BrewError as e:
+            logger.error(f"卸载失败: {e}")
+            return False
 
 
 # 模块级全局实例
