@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MacMind - 赛博朋克AI助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="cyberpunk-container">
+        <!-- 背景特效 -->
+        <div class="background-grid"></div>
+        <div class="scanline"></div>
+        
+        <!-- 顶部状态栏 -->
+        <header class="status-bar">
+            <div class="status-left">
+                <div class="logo-container">
+                    <span class="logo-bracket">[</span>
+                    <span class="logo-text">MacMind</span>
+                    <span class="logo-bracket">]</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span class="status-text" id="status-text">INITIALIZING</span>
+                </div>
+            </div>
+            <div class="status-right">
+                <button class="btn-icon" id="clear-btn" title="清空对话">
+                    <span>⟲</span>
+                </button>
+                <button class="btn-icon" id="info-btn" title="系统信息">
+                    <span>ⓘ</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主要内容区 -->
+        <main class="main-container">
+            <!-- 对话区域 -->
+            <div class="chat-window" id="chat-window">
+                <div class="welcome-message">
+                    <div class="welcome-title">
+                        <span class="glitch" data-text="SYSTEM READY">/SYSTEM READY/</span>
+                    </div>
+                    <div class="welcome-subtitle">
+                        MacMind AI Assistant v2.0 - Phase 2
+                    </div>
+                    <div class="welcome-features">
+                        <div class="feature-item">➤ 智能对话</div>
+                        <div class="feature-item">➤ 软件管理</div>
+                        <div class="feature-item">➤ 应用控制</div>
+                        <div class="feature-item">➤ 实时执行</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <span class="input-prefix">&gt;&gt;</span>
+                    <input 
+                        type="text" 
+                        id="message-input" 
+                        class="message-input" 
+                        placeholder="输入指令... (例如: 帮我搜索一个绘图软件)"
+                        autocomplete="off"
+                    >
+                    <button class="send-btn" id="send-btn">
+                        <span class="send-icon">⬆</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 工具执行提示 -->
+        <div class="tool-notification" id="tool-notification">
+            <div class="tool-notification-content">
+                <span class="tool-icon">⚙</span>
+                <span class="tool-text" id="tool-text">执行中...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
