@@ -223,6 +223,13 @@ def handle_connect():
     WebSocket连接建立
     """
     logger.info('客户端已连接')
+    
+    if conversation_manager.get_message_count() == 0:
+        conversation_manager.add_system_message(
+            conversation_manager.get_optimized_system_prompt()
+        )
+        logger.info('已初始化系统提示词')
+    
     emit('connected', {'status': 'connected'})
 
 
