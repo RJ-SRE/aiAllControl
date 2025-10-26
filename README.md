@@ -59,7 +59,45 @@ python3 macmind.py chat
 
 ---
 
-## 🧠 核心功能
+## 🎨 前端交互完整教程
+
+本章节详细介绍如何通过Web前端与MacMind进行交互,实现各种智能操作。
+
+### 📱 第一步: 启动MacMind Web服务
+
+#### 1.1 准备环境
+
+确保已完成安装和配置(参见上方[快速开始](#-快速开始)章节):
+
+```bash
+# 验证Python环境
+python3 --version  # 需要 3.8+
+
+# 验证依赖安装
+pip list | grep -E "flask|socketio"
+```
+
+#### 1.2 启动服务
+
+**推荐方式 - 使用启动脚本:**
+
+```bash
+cd /path/to/aiAllControl
+chmod +x start_web.sh    # 首次使用需要添加执行权限
+./start_web.sh
+```
+
+**备用方式 - 直接启动:**
+
+```bash
+python3 server/app.py
+```
+
+#### 1.3 确认服务启动成功
+
+看到以下输出表示成功:
+
+```
 
 ### 1. 智能软件管理
 ```bash
