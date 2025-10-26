@@ -1,32 +1,45 @@
 """
 Mac系统控制模块 - Mac Controller
 
-通过AppleScript和系统命令控制macOS应用和系统设置。
+通过AppleScript控制macOS系统和应用程序。
 
-设计模式: 单例模式 + 命令模式
-- 单例模式: 确保全局只有一个Mac控制器
-- 命令模式: 封装系统操作为独立命令
+主要功能:
+1. 应用程序控制 - 打开、关闭、激活应用
+2. 应用状态查询 - 查询应用是否运行
+3. 系统信息获取 - macOS版本、Bundle ID等
+4. 通知管理 - 引导用户管理应用通知权限
+5. 系统设置 - 打开系统偏好设置面板
 
-核心功能:
-1. 应用控制 - 打开、关闭、查询应用状态
-2. 通知管理 - 启用、禁用应用通知权限
-3. 快捷键设置 - 配置全局快捷键(需要第三方工具)
-4. 系统信息 - 查询macOS版本、应用信息等
+技术实现:
+- 使用osascript执行AppleScript命令
+- 使用subprocess模块调用系统命令
+- 提供Python友好的API接口
+
+安全考虑:
+- 所有用户输入都经过转义,防止命令注入
+- 不执行危险的系统操作
+- 权限操作需要用户手动授权
 
 使用示例:
-    from infrastructure.mac_controller import mac_controller
+    from infrastructure.mac_controller import MacController
     
-    # 关闭应用
-    mac_controller.quit_app("网易云音乐")
+    controller = MacController()
     
     # 打开应用
-    mac_controller.open_app("Safari")
+    controller.open_app("Safari")
     
-    # 禁用通知
-    mac_controller.disable_notifications("com.netease.163music")
+    # 关闭应用
+    controller.quit_app("Safari")
+    
+    # 检查应用是否运行
+    is_running = controller.is_app_running("Safari")
+    
+    # 获取系统版本
+    version = controller.get_macos_version()
 """
 
 import subprocess
+import platform
 from typing import Optional, List
 from infrastructure.logger import logger
 from domain.exceptions import MacControlError
@@ -34,59 +47,79 @@ from domain.exceptions import MacControlError
 
 class MacController:
     """
-    Mac系统控制器 - 单例模式实现
+    Mac系统控制器
     
     属性:
-        _instance: 类级别的单例实例
-        _initialized: 标记是否已初始化
+        is_macos: 标记是否运行在macOS系统
     
     设计说明:
-        采用单例模式确保全局只有一个Mac控制器,
-        避免重复的系统调用和资源浪费。
+        封装osascript和系统命令调用,提供统一的Python API。
+        所有方法都会检查系统类型,非macOS系统会记录警告。
     """
-    
-    _instance: Optional['MacController'] = None
-    
-    def __new__(cls):
-        """
-        控制对象创建,实现单例模式
-        
-        返回:
-            MacController: 全局唯一的Mac控制器实例
-        """
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
     
     def __init__(self):
         """
         初始化Mac控制器
         
-        说明:
-            使用_initialized标志避免重复初始化
+        检查系统类型,如果不是macOS会记录警告。
         """
-        if hasattr(self, '_initialized'):
-            return
+        self.is_macos = platform.system() == 'Darwin'
         
-        self._initialized = True
-        logger.debug("MacController初始化完成")
+        if not self.is_macos:
+            logger.warning(
+                f"当前系统不是macOS (系统: {platform.system()}), "
+                f"Mac控制功能将不可用"
+            )
+        else:
+            logger.debug("MacController初始化完成")
     
-    def _execute_applescript(self, script: str) -> str:
+    def _check_macos(self):
+        """
+        检查是否运行在macOS系统
+        
+        抛出:
+            MacControlError: 如果不是macOS系统
+        """
+        if not self.is_macos:
+            raise MacControlError(
+                "Mac控制功能仅在macOS系统可用",
+                system=platform.system()
+            )
+    
+    def _escape_applescript_string(self, text: str) -> str:
+        """
+        转义AppleScript字符串
+        
+        参数:
+            text: 原始字符串
+        
+        返回:
+            str: 转义后的字符串
+        
+        说明:
+            防止AppleScript注入攻击
+        """
+        return text.replace('"', '\\"').replace('\\', '\\\\')
+    
+    def _execute_applescript(self, script: str, timeout: int = 10) -> str:
         """
         执行AppleScript脚本
         
         参数:
             script: AppleScript脚本内容
+            timeout: 超时时间(秒)
         
         返回:
-            str: 脚本输出
+            str: 脚本执行输出
         
         抛出:
             MacControlError: 脚本执行失败
         
-        说明:
-            使用osascript命令执行AppleScript
+        示例:
+            output = self._execute_applescript('tell application "Safari" to activate')
         """
+        self._check_macos()
+        
         try:
             logger.debug(f"执行AppleScript: {script[:100]}...")
             
@@ -94,95 +127,102 @@ class MacController:
                 ['osascript', '-e', script],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=timeout,
                 check=True
             )
             
             return result.stdout.strip()
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"AppleScript执行失败: {e.stderr}")
+            error_msg = e.stderr.strip() if e.stderr else str(e)
+            logger.error(f"AppleScript执行失败: {error_msg}")
             raise MacControlError(
                 "AppleScript执行失败",
-                detail=e.stderr,
-                context={'script': script[:100]}
+                script=script[:100],
+                error=error_msg,
+                cause=e
             )
         except subprocess.TimeoutExpired:
-            logger.error("AppleScript执行超时")
+            logger.error(f"AppleScript执行超时")
             raise MacControlError(
                 "AppleScript执行超时",
-                detail="脚本执行超过30秒",
-                context={'script': script[:100]}
+                script=script[:100],
+                timeout=timeout
             )
         except Exception as e:
-            logger.error(f"AppleScript执行异常: {e}", exc_info=True)
+            logger.error(f"AppleScript执行错误: {e}", exc_info=True)
             raise MacControlError(
-                "AppleScript执行异常",
-                detail=str(e),
-                context={'script': script[:100]}
+                "AppleScript执行错误",
+                script=script[:100],
+                cause=e
             )
-    
-    def quit_app(self, app_name: str) -> bool:
-        """
-        关闭应用程序
-        
-        参数:
-            app_name: 应用名称(如: "网易云音乐", "Safari")
-        
-        返回:
-            bool: 是否成功关闭
-        
-        说明:
-            使用AppleScript的quit命令优雅地关闭应用
-        
-        示例:
-            success = mac_controller.quit_app("网易云音乐")
-            if success:
-                print("应用已关闭")
-        """
-        try:
-            logger.info(f"正在关闭应用: {app_name}")
-            
-            script = f'quit app "{app_name}"'
-            self._execute_applescript(script)
-            
-            logger.info(f"成功关闭应用: {app_name}")
-            return True
-            
-        except MacControlError as e:
-            logger.error(f"关闭应用失败: {e}")
-            return False
     
     def open_app(self, app_name: str) -> bool:
         """
         打开应用程序
         
         参数:
-            app_name: 应用名称(如: "Safari", "企业微信")
+            app_name: 应用名称(如"Safari", "网易云音乐")
         
         返回:
-            bool: 是否成功打开
+            bool: 打开是否成功
         
         说明:
-            使用AppleScript的activate命令打开应用
+            使用AppleScript的activate命令打开并激活应用。
+            如果应用未安装会抛出异常。
         
         示例:
-            success = mac_controller.open_app("Safari")
-            if success:
-                print("应用已打开")
+            controller.open_app("Safari")
+            controller.open_app("网易云音乐")
         """
+        app_name = self._escape_applescript_string(app_name)
+        script = f'tell application "{app_name}" to activate'
+        
         try:
-            logger.info(f"正在打开应用: {app_name}")
-            
-            script = f'tell application "{app_name}" to activate'
             self._execute_applescript(script)
-            
-            logger.info(f"成功打开应用: {app_name}")
+            logger.info(f"已打开应用: {app_name}")
             return True
-            
         except MacControlError as e:
-            logger.error(f"打开应用失败: {e}")
-            return False
+            logger.error(f"打开应用失败: {app_name}")
+            raise
+    
+    def quit_app(self, app_name: str, force: bool = False) -> bool:
+        """
+        关闭应用程序
+        
+        参数:
+            app_name: 应用名称
+            force: 是否强制关闭(不保存)
+        
+        返回:
+            bool: 关闭是否成功
+        
+        说明:
+            - force=False: 正常退出,会提示保存
+            - force=True: 强制退出,不保存未保存的内容
+        
+        示例:
+            controller.quit_app("Safari")
+            controller.quit_app("TextEdit", force=True)
+        """
+        app_name = self._escape_applescript_string(app_name)
+        
+        if force:
+            script = f'tell application "{app_name}" to quit without saving'
+        else:
+            script = f'tell application "{app_name}" to quit'
+        
+        try:
+            if not self.is_app_running(app_name):
+                logger.info(f"应用未运行,无需关闭: {app_name}")
+                return True
+            
+            self._execute_applescript(script)
+            logger.info(f"已关闭应用: {app_name}")
+            return True
+        except MacControlError as e:
+            logger.error(f"关闭应用失败: {app_name}")
+            raise
     
     def is_app_running(self, app_name: str) -> bool:
         """
@@ -192,128 +232,61 @@ class MacController:
             app_name: 应用名称
         
         返回:
-            bool: 是否正在运行
+            bool: 应用是否运行
+        
+        说明:
+            查询System Events获取运行中的应用列表
         
         示例:
-            if mac_controller.is_app_running("Safari"):
+            if controller.is_app_running("Safari"):
                 print("Safari正在运行")
         """
+        app_name = self._escape_applescript_string(app_name)
+        script = f'''
+        tell application "System Events"
+            set appList to name of every process
+            return appList contains "{app_name}"
+        end tell
+        '''
+        
         try:
-            script = f'''
-                tell application "System Events"
-                    return (name of processes) contains "{app_name}"
-                end tell
-            '''
-            
-            result = self._execute_applescript(script)
-            is_running = result.lower() == 'true'
-            
-            logger.debug(f"应用 {app_name} 运行状态: {is_running}")
+            output = self._execute_applescript(script)
+            is_running = output.lower() == 'true'
+            logger.debug(f"应用运行状态 {app_name}: {is_running}")
             return is_running
-            
         except MacControlError:
+            logger.warning(f"无法查询应用状态: {app_name}")
             return False
     
     def get_running_apps(self) -> List[str]:
         """
-        获取所有正在运行的应用列表
+        获取所有运行中的应用程序列表
         
         返回:
-            List[str]: 应用名称列表
+            List[str]: 运行中的应用名称列表
         
         示例:
-            apps = mac_controller.get_running_apps()
-            print(f"正在运行 {len(apps)} 个应用")
+            apps = controller.get_running_apps()
+            for app in apps:
+                print(f"运行中: {app}")
         """
+        script = '''
+        tell application "System Events"
+            set appList to name of every process
+            return appList
+        end tell
+        '''
+        
         try:
-            script = '''
-                tell application "System Events"
-                    return name of every process whose background only is false
-                end tell
-            '''
-            
-            result = self._execute_applescript(script)
-            
-            if result:
-                apps = [app.strip() for app in result.split(', ')]
-                logger.debug(f"获取到 {len(apps)} 个运行中的应用")
-                return apps
-            
-            return []
-            
+            output = self._execute_applescript(script)
+            apps = [app.strip() for app in output.split(',') if app.strip()]
+            logger.debug(f"获取到{len(apps)}个运行中的应用")
+            return apps
         except MacControlError:
-            logger.error("获取运行中的应用列表失败")
+            logger.error("获取运行中应用列表失败")
             return []
     
-    def disable_notifications(self, bundle_id: str) -> bool:
-        """
-        禁用应用的通知权限
-        
-        参数:
-            bundle_id: 应用的Bundle ID(如: "com.netease.163music")
-        
-        返回:
-            bool: 是否成功禁用
-        
-        说明:
-            需要"辅助功能"权限才能修改通知设置
-            macOS 12+可能需要手动授权
-        
-        注意:
-            此功能可能受到macOS安全限制,建议引导用户手动设置
-        
-        示例:
-            success = mac_controller.disable_notifications("com.netease.163music")
-            if not success:
-                print("请手动在系统设置中禁用通知")
-        """
-        try:
-            logger.info(f"正在禁用通知: {bundle_id}")
-            logger.warning("通知权限修改需要用户手动操作,将打开系统设置")
-            
-            script = '''
-                tell application "System Preferences"
-                    activate
-                    reveal pane id "com.apple.preference.notifications"
-                end tell
-            '''
-            self._execute_applescript(script)
-            
-            logger.info("已打开通知设置面板,请手动禁用通知")
-            return True
-            
-        except MacControlError as e:
-            logger.error(f"打开通知设置失败: {e}")
-            return False
-    
-    def get_macos_version(self) -> Optional[str]:
-        """
-        获取macOS版本
-        
-        返回:
-            Optional[str]: macOS版本号(如: "13.0")
-        
-        示例:
-            version = mac_controller.get_macos_version()
-            print(f"macOS版本: {version}")
-        """
-        try:
-            result = subprocess.run(
-                ['sw_vers', '-productVersion'],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            version = result.stdout.strip()
-            logger.debug(f"macOS版本: {version}")
-            return version
-            
-        except Exception as e:
-            logger.error(f"获取macOS版本失败: {e}")
-            return None
-    
-    def get_bundle_id(self, app_name: str) -> Optional[str]:
+    def get_app_bundle_id(self, app_name: str) -> Optional[str]:
         """
         获取应用的Bundle ID
         
@@ -321,111 +294,162 @@ class MacController:
             app_name: 应用名称
         
         返回:
-            Optional[str]: Bundle ID(如: "com.apple.Safari")
+            str: Bundle ID (如"com.apple.Safari"), 失败返回None
         
         说明:
-            通过osascript查询应用的Bundle ID
+            Bundle ID用于系统级别的应用标识
         
         示例:
-            bundle_id = mac_controller.get_bundle_id("Safari")
-            # "com.apple.Safari"
+            bundle_id = controller.get_app_bundle_id("Safari")
+            # 返回: "com.apple.Safari"
         """
+        app_name = self._escape_applescript_string(app_name)
+        script = f'id of application "{app_name}"'
+        
         try:
-            script = f'''
-                tell application "System Events"
-                    return bundle identifier of application process "{app_name}"
-                end tell
-            '''
-            
-            bundle_id = self._execute_applescript(script)
-            logger.debug(f"应用 {app_name} 的Bundle ID: {bundle_id}")
-            return bundle_id
-            
+            output = self._execute_applescript(script)
+            logger.debug(f"应用Bundle ID: {app_name} -> {output}")
+            return output if output else None
         except MacControlError:
-            logger.error(f"获取Bundle ID失败: {app_name}")
+            logger.warning(f"无法获取Bundle ID: {app_name}")
             return None
     
-    def open_system_preferences(self, pane_id: Optional[str] = None) -> bool:
+    def get_macos_version(self) -> str:
         """
-        打开系统设置
+        获取macOS版本
+        
+        返回:
+            str: macOS版本字符串(如"14.0")
+        
+        示例:
+            version = controller.get_macos_version()
+            print(f"macOS版本: {version}")
+        """
+        self._check_macos()
+        
+        try:
+            version = platform.mac_ver()[0]
+            logger.debug(f"macOS版本: {version}")
+            return version
+        except Exception as e:
+            logger.error(f"获取macOS版本失败: {e}")
+            return "unknown"
+    
+    def open_system_preferences(self, pane: Optional[str] = None) -> bool:
+        """
+        打开系统偏好设置
         
         参数:
-            pane_id: 设置面板ID(可选)
+            pane: 偏好设置面板ID(可选)
                 - "com.apple.preference.security" - 安全性与隐私
                 - "com.apple.preference.notifications" - 通知
                 - "com.apple.preference.keyboard" - 键盘
+                - None - 打开主界面
         
         返回:
-            bool: 是否成功打开
+            bool: 打开是否成功
         
         示例:
-            # 打开安全性与隐私设置
-            mac_controller.open_system_preferences("com.apple.preference.security")
+            # 打开系统偏好设置主界面
+            controller.open_system_preferences()
+            
+            # 打开安全性与隐私
+            controller.open_system_preferences("com.apple.preference.security")
         """
+        if pane:
+            pane = self._escape_applescript_string(pane)
+            script = f'tell application "System Preferences" to reveal pane "{pane}"'
+        else:
+            script = 'tell application "System Preferences" to activate'
+        
         try:
-            if pane_id:
-                script = f'''
-                    tell application "System Preferences"
-                        activate
-                        reveal pane id "{pane_id}"
-                    end tell
-                '''
-            else:
-                script = '''
-                    tell application "System Preferences"
-                        activate
-                    end tell
-                '''
-            
             self._execute_applescript(script)
-            logger.info(f"已打开系统设置: {pane_id or '主页'}")
+            logger.info(f"已打开系统偏好设置: {pane or '主界面'}")
             return True
-            
-        except MacControlError as e:
-            logger.error(f"打开系统设置失败: {e}")
+        except MacControlError:
+            logger.error(f"打开系统偏好设置失败: {pane}")
             return False
     
-    def execute_shell_command(self, command: str) -> Optional[str]:
+    def guide_notification_settings(self, app_name: str) -> str:
         """
-        执行shell命令
+        引导用户设置应用通知权限
         
         参数:
-            command: shell命令
+            app_name: 应用名称
         
         返回:
-            Optional[str]: 命令输出
+            str: 引导说明文本
         
-        警告:
-            此方法存在安全风险,仅用于可信命令
-            不要执行用户提供的原始命令
+        说明:
+            由于macOS安全限制,无法通过脚本直接修改通知权限,
+            此方法提供引导说明,打开系统设置让用户手动操作。
         
         示例:
-            output = mac_controller.execute_shell_command("ls -la ~")
+            guide = controller.guide_notification_settings("网易云音乐")
+            print(guide)
         """
+        guide_text = f"""
+📢 设置 {app_name} 的通知权限
+
+由于macOS安全限制,需要手动设置通知权限:
+
+步骤:
+1. 打开"系统偏好设置" → "通知"
+2. 在左侧列表中找到"{app_name}"
+3. 调整通知设置(允许/禁止通知)
+
+提示: 您也可以点击下方链接直接打开通知设置面板
+"""
+        
+        logger.info(f"引导用户设置通知权限: {app_name}")
+        
         try:
-            logger.warning(f"执行shell命令: {command}")
-            
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=True
-            )
-            
-            return result.stdout.strip()
-            
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Shell命令执行失败: {e.stderr}")
-            raise MacControlError(
-                "Shell命令执行失败",
-                detail=e.stderr,
-                context={'command': command}
-            )
-        except Exception as e:
-            logger.error(f"Shell命令执行异常: {e}", exc_info=True)
-            return None
+            self.open_system_preferences("com.apple.preference.notifications")
+        except Exception:
+            pass
+        
+        return guide_text.strip()
+    
+    def guide_accessibility_permission(self) -> str:
+        """
+        引导用户授予辅助功能权限
+        
+        返回:
+            str: 引导说明文本
+        
+        说明:
+            某些Mac控制功能需要"辅助功能"权限。
+            此方法提供引导说明。
+        
+        示例:
+            guide = controller.guide_accessibility_permission()
+            print(guide)
+        """
+        guide_text = """
+🔐 授予辅助功能权限
 
+某些系统控制功能需要"辅助功能"权限:
 
-mac_controller = MacController()
+步骤:
+1. 打开"系统偏好设置" → "安全性与隐私"
+2. 点击"隐私"标签页
+3. 在左侧列表选择"辅助功能"
+4. 点击左下角锁图标,输入密码解锁
+5. 勾选"终端"或您使用的终端应用
+6. 重新运行程序
+
+提示: 您也可以点击下方链接直接打开安全设置面板
+"""
+        
+        logger.info("引导用户授予辅助功能权限")
+        
+        try:
+            self.open_system_preferences("com.apple.preference.security")
+        except Exception:
+            pass
+        
+        return guide_text.strip()
+    
+    def __repr__(self) -> str:
+        """返回控制器的字符串表示"""
+        return f"MacController(macos={self.is_macos}, version={self.get_macos_version() if self.is_macos else 'N/A'})"
