@@ -1,5 +1,6 @@
-# 🧠 MacMind — AI 驱动的 macOS 智能助手
-##deamo-link:** https://www.bilibili.com/video/BV16zszzxEuj/**
+# 🧠 MacMind — AI 驱动的 macOS 智能助手#
+
+deamo-link:** https://www.bilibili.com/video/BV16zszzxEuj/**
 author:RJ
 assistant：WQ、DH
 date:2025-10-26-21：00
