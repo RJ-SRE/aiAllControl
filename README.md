@@ -33,7 +33,7 @@ git clone https://github.com/RJ-SRE/aiAllControl.git
 cd aiAllControl
 
 # 2. 安装依赖
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # 3. 配置 API Key
 mkdir -p ~/.macmind
