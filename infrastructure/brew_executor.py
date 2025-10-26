@@ -34,13 +34,14 @@ Homebrew命令执行器 - Homebrew Command Executor
 
 import subprocess
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from infrastructure.logger import logger
 from infrastructure.config import config
 from domain.exceptions import BrewError
+from infrastructure.package_manager_base import PackageManagerBase, PackageManagerType
 
 
-class BrewExecutor:
+class BrewExecutor(PackageManagerBase):
     """
     Homebrew命令执行器
     
@@ -60,6 +61,23 @@ class BrewExecutor:
         Intel Mac的路径通常是 /usr/local/bin/brew
         """
         self.brew_path = config.get('homebrew_path', '/opt/homebrew/bin/brew')
+    
+    def get_type(self) -> PackageManagerType:
+        """返回包管理器类型"""
+        return PackageManagerType.BREW
+    
+    def is_available(self) -> bool:
+        """检查Homebrew是否可用"""
+        try:
+            result = subprocess.run(
+                [self.brew_path, '--version'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
     
     def _execute(self, args: List[str], timeout: int = 30) -> str:
         """
@@ -234,13 +252,13 @@ class BrewExecutor:
                 context={'package': package}
             )
     
-    def install(self, package: str, is_cask: bool = False) -> bool:
+    def install(self, package: str, options: Optional[Dict[str, Any]] = None) -> bool:
         """
         安装软件包
         
         参数:
             package: 包名
-            is_cask: 是否为cask包（GUI应用）
+            options: 可选参数字典，支持 {'is_cask': bool}
         
         返回:
             bool: 安装是否成功
@@ -257,14 +275,14 @@ class BrewExecutor:
             brew.install('wget')
             
             # 安装GUI应用
-            brew.install('drawio', is_cask=True)
+            brew.install('drawio', {'is_cask': True})
         """
         try:
             # 构建安装命令参数
             args = ['install']
             
             # 如果是cask包，添加--cask参数
-            if is_cask:
+            if options and options.get('is_cask', False):
                 args.append('--cask')
             
             args.append(package)
