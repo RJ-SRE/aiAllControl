@@ -82,9 +82,11 @@ body {
         rgba(0, 245, 255, 0.02) 50%
     );
     background-size: 100% 4px;
-    animation: scanline 10s linear infinite;
+    animation: scanline 20s linear infinite;
     pointer-events: none;
     z-index: 2;
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 @keyframes scanline {
@@ -138,21 +140,24 @@ body {
 
 .logo-bracket {
     color: var(--cyber-blue);
-    text-shadow: 0 0 10px var(--cyber-blue);
+    text-shadow: 0 0 5px var(--cyber-blue);
 }
 
 .logo-text {
     color: var(--cyber-pink);
-    text-shadow: 0 0 10px var(--cyber-pink);
+    text-shadow: 0 0 5px var(--cyber-pink);
+}
+
+.logo-text:hover {
     animation: glow-pulse 2s ease-in-out infinite;
 }
 
 @keyframes glow-pulse {
     0%, 100% {
-        text-shadow: 0 0 10px var(--cyber-pink);
+        text-shadow: 0 0 5px var(--cyber-pink);
     }
     50% {
-        text-shadow: 0 0 20px var(--cyber-pink), 0 0 30px var(--cyber-pink);
+        text-shadow: 0 0 8px var(--cyber-pink), 0 0 10px var(--cyber-pink);
     }
 }
 
@@ -167,18 +172,20 @@ body {
     height: 10px;
     border-radius: 50%;
     background: var(--cyber-green);
-    box-shadow: 0 0 10px var(--cyber-green);
+    box-shadow: 0 0 5px var(--cyber-green);
     animation: pulse 2s ease-in-out infinite;
+    will-change: opacity;
+    transform: translateZ(0);
 }
 
 .status-dot.connecting {
     background: var(--cyber-yellow);
-    box-shadow: 0 0 10px var(--cyber-yellow);
+    box-shadow: 0 0 5px var(--cyber-yellow);
 }
 
 .status-dot.error {
     background: var(--cyber-pink);
-    box-shadow: 0 0 10px var(--cyber-pink);
+    box-shadow: 0 0 5px var(--cyber-pink);
 }
 
 @keyframes pulse {
@@ -214,7 +221,7 @@ body {
 
 .btn-icon:hover {
     border-color: var(--border-glow);
-    box-shadow: 0 0 15px var(--border-glow);
+    box-shadow: 0 0 8px var(--border-glow);
     background: rgba(0, 245, 255, 0.1);
 }
 
@@ -228,6 +235,7 @@ body {
     flex-direction: column;
     padding: 20px;
     overflow: hidden;
+    contain: layout style paint;
 }
 
 /* ==============================================
@@ -255,7 +263,7 @@ body {
 
 .chat-window::-webkit-scrollbar-thumb {
     background: var(--cyber-blue);
-    box-shadow: 0 0 10px var(--cyber-blue);
+    box-shadow: 0 0 5px var(--cyber-blue);
 }
 
 /* 欢迎消息 */
@@ -284,7 +292,8 @@ body {
 .glitch {
     color: var(--cyber-pink);
     position: relative;
-    animation: glitch 5s infinite;
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 .glitch::before,
@@ -298,28 +307,14 @@ body {
 
 .glitch::before {
     left: 2px;
-    text-shadow: -2px 0 var(--cyber-blue);
+    text-shadow: -1px 0 var(--cyber-blue);
     clip: rect(24px, 550px, 90px, 0);
-    animation: glitch-anim 3s infinite linear alternate-reverse;
 }
 
 .glitch::after {
     left: -2px;
-    text-shadow: -2px 0 var(--cyber-green);
+    text-shadow: -1px 0 var(--cyber-green);
     clip: rect(85px, 550px, 140px, 0);
-    animation: glitch-anim 2s infinite linear alternate-reverse;
-}
-
-@keyframes glitch {
-    0% {
-        text-shadow: 0 0 10px var(--cyber-pink);
-    }
-    50% {
-        text-shadow: 0 0 20px var(--cyber-pink);
-    }
-    100% {
-        text-shadow: 0 0 10px var(--cyber-pink);
-    }
 }
 
 @keyframes glitch-anim {
@@ -393,6 +388,7 @@ body {
 .message {
     margin-bottom: 20px;
     animation: slideIn 0.3s ease-out;
+    contain: layout style paint;
 }
 
 @keyframes slideIn {
@@ -464,7 +460,7 @@ body {
     margin: 15px 0 10px 0;
     font-weight: bold;
     color: var(--cyber-pink);
-    text-shadow: 0 0 5px var(--cyber-pink);
+    text-shadow: 0 0 3px var(--cyber-pink);
 }
 
 .message-text h1 { font-size: 1.8em; }
@@ -531,7 +527,7 @@ body {
 .message-text a:hover {
     color: var(--cyber-pink);
     border-bottom-color: var(--cyber-pink);
-    text-shadow: 0 0 5px var(--cyber-pink);
+    text-shadow: 0 0 3px var(--cyber-pink);
 }
 
 .message-text strong {
@@ -599,6 +595,7 @@ body {
     border-radius: 4px;
     padding: 15px;
     transition: all 0.3s ease;
+    contain: layout style paint;
 }
 
 .input-wrapper:focus-within {
@@ -610,7 +607,7 @@ body {
     color: var(--cyber-pink);
     font-size: 18px;
     margin-right: 10px;
-    text-shadow: 0 0 10px var(--cyber-pink);
+    text-shadow: 0 0 5px var(--cyber-pink);
 }
 
 .message-input {

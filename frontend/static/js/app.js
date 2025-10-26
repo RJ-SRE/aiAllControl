@@ -203,6 +203,10 @@ class MacMindApp {
         setTimeout(() => {
             const welcome = this.chatWindow.querySelector('.welcome-message');
             if (welcome && this.chatWindow.children.length > 1) {
+                const glitchElement = welcome.querySelector('.glitch');
+                if (glitchElement) {
+                    glitchElement.style.animation = 'none';
+                }
                 welcome.style.opacity = '0';
                 setTimeout(() => welcome.remove(), 300);
             }
