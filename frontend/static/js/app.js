@@ -21,9 +21,24 @@ class MacMindApp {
     }
     
     init() {
+        this.setupMarkdown();
         this.connectWebSocket();
         this.attachEventListeners();
         this.clearWelcomeMessage();
+    }
+    
+    setupMarkdown() {
+        // 配置 marked 支持代码高亮
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
     }
     
     connectWebSocket() {
@@ -123,7 +138,20 @@ class MacMindApp {
         }
         
         const textDiv = document.createElement('div');
-        textDiv.textContent = text;
+        textDiv.className = 'message-text';
+        
+        if (type === 'ai') {
+            // AI 响应使用 Markdown 渲染
+            textDiv.innerHTML = marked.parse(text);
+            // 高亮所有代码块
+            textDiv.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        } else {
+            // 用户消息保持纯文本但支持换行
+            textDiv.textContent = text;
+        }
+        
         contentDiv.appendChild(textDiv);
         
         messageDiv.appendChild(contentDiv);
