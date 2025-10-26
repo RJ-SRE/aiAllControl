@@ -205,18 +205,21 @@ class MacController:
             controller.quit_app("Safari")
             controller.quit_app("TextEdit", force=True)
         """
-        app_name = self._escape_applescript_string(app_name)
-        
-        if force:
-            script = f'tell application "{app_name}" to quit without saving'
-        else:
-            script = f'tell application "{app_name}" to quit'
-        
         try:
             if not self.is_app_running(app_name):
                 logger.info(f"应用未运行,无需关闭: {app_name}")
                 return True
-            
+        except MacControlError:
+            logger.warning(f"无法检查应用状态,尝试直接关闭: {app_name}")
+        
+        escaped_app_name = self._escape_applescript_string(app_name)
+        
+        if force:
+            script = f'tell application "{escaped_app_name}" to quit without saving'
+        else:
+            script = f'tell application "{escaped_app_name}" to quit'
+        
+        try:
             self._execute_applescript(script)
             logger.info(f"已关闭应用: {app_name}")
             return True
