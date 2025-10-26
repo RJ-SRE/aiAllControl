@@ -367,12 +367,12 @@ class CLIController:
             chat
         
         功能:
-            进入交互式AI对话模式，支持持续对话和上下文记忆
+            进入交互式AI对话模式，支持持续对话、上下文记忆和工具调用
         
         示例:
             chat
         """
-        print("💬 进入交互式对话模式")
+        print("💬 进入交互式对话模式 (增强版 - 支持动作执行)")
         print("提示: 输入 'exit' 或 'quit' 退出对话")
         print("提示: 输入 'clear' 清空对话历史")
         print("提示: 输入 'save' 保存当前会话")
@@ -385,6 +385,13 @@ class CLIController:
             print(f"❌ AI客户端初始化失败: {e}")
             print("请检查API密钥配置")
             return
+        
+        from infrastructure.tools import get_tool_schemas
+        from infrastructure.tool_executor import ToolExecutor
+        import json
+        
+        tool_executor = ToolExecutor()
+        tools = get_tool_schemas()
         
         conversation_manager.add_system_message(
             conversation_manager.get_optimized_system_prompt()
@@ -415,27 +422,83 @@ class CLIController:
                 
                 print("🤖 AI: ", end="", flush=True)
                 
-                context = conversation_manager.get_context()
+                max_iterations = 5
+                iteration = 0
                 
-                try:
-                    response = ai_client.client.chat.completions.create(
-                        model=ai_client.model,
-                        messages=context
-                    )
+                while iteration < max_iterations:
+                    iteration += 1
+                    context = conversation_manager.get_context()
                     
-                    if not response.choices or not response.choices[0].message.content:
-                        raise ValueError("AI响应格式无效")
-                    
-                    response_text = response.choices[0].message.content
-                    
-                except Exception as e:
-                    logger.error(f"AI响应失败: {e}", exc_info=True)
-                    response_text = f"抱歉，AI服务暂时不可用: {str(e)}\n\n请检查:\n1. API密钥是否配置正确\n2. 网络连接是否正常\n3. API配额是否充足"
+                    try:
+                        response = ai_client.client.chat.completions.create(
+                            model=ai_client.model,
+                            messages=context,
+                            tools=tools,
+                            tool_choice="auto"
+                        )
+                        
+                        if not response.choices:
+                            raise ValueError("AI响应格式无效")
+                        
+                        message = response.choices[0].message
+                        
+                        if message.tool_calls:
+                            tool_calls_list = []
+                            for tool_call in message.tool_calls:
+                                tool_calls_list.append({
+                                    "id": tool_call.id,
+                                    "type": tool_call.type,
+                                    "function": {
+                                        "name": tool_call.function.name,
+                                        "arguments": tool_call.function.arguments
+                                    }
+                                })
+                            
+                            conversation_manager.add_tool_call_message(tool_calls_list)
+                            
+                            for tool_call in message.tool_calls:
+                                function_name = tool_call.function.name
+                                arguments = json.loads(tool_call.function.arguments)
+                                
+                                print(f"🔧 [执行工具: {function_name}]", end=" ", flush=True)
+                                
+                                result = tool_executor.execute(function_name, arguments)
+                                result_json = json.dumps(result, ensure_ascii=False)
+                                
+                                conversation_manager.add_tool_result_message(
+                                    tool_call.id,
+                                    function_name,
+                                    result_json
+                                )
+                                
+                                if result["success"]:
+                                    print("✅")
+                                else:
+                                    print(f"❌ {result.get('error', '未知错误')}")
+                            
+                            continue
+                        
+                        else:
+                            if not message.content:
+                                raise ValueError("AI响应内容为空")
+                            
+                            response_text = message.content
+                            print(response_text)
+                            print()
+                            
+                            conversation_manager.add_assistant_message(response_text)
+                            break
+                        
+                    except Exception as e:
+                        logger.error(f"AI响应失败: {e}", exc_info=True)
+                        response_text = f"抱歉，AI服务暂时不可用: {str(e)}\n\n请检查:\n1. API密钥是否配置正确\n2. 网络连接是否正常\n3. API配额是否充足"
+                        print(response_text)
+                        print()
+                        conversation_manager.add_assistant_message(response_text)
+                        break
                 
-                print(response_text)
-                print()
-                
-                conversation_manager.add_assistant_message(response_text)
+                if iteration >= max_iterations:
+                    print("⚠️ 达到最大工具调用次数限制\n")
                 
             except KeyboardInterrupt:
                 print("\n\n👋 对话已中断")
