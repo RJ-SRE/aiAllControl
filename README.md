@@ -5,9 +5,9 @@
 > 让你的 Mac 能听懂、会思考、可执行的 AI 控制系统
 
 **deamo-link**:**https://www.bilibili.com/video/BV16zszzxEuj/**
-author:RJ
-assistant：WQ、DH
-date:2025-10-26-21：00
+- author:RJ
+- assistant：WQ、DH
+- date:2025-10-26-21：00
 
 **MacMind** 通过集成七牛云大模型,让你用自然语言控制 macOS:
 - 🔍 智能搜索和安装软件
