@@ -49,6 +49,7 @@ from datetime import datetime
 
 from domain.package import Package, PackageType, LicenseType
 from infrastructure.brew_executor import brew
+from infrastructure.package_manager_factory import package_manager_factory
 from infrastructure.logger import logger
 from infrastructure.config import config
 
@@ -91,7 +92,10 @@ class PackageRepository:
         
         self._installed_cache: Optional[Set[str]] = None
         
+        self.package_manager = package_manager_factory.get_manager()
+        
         logger.debug(f"PackageRepository初始化完成，缓存目录: {self.cache_dir}")
+        logger.debug(f"使用包管理器: {self.package_manager.get_name()}")
     
     def search(self, keyword: str) -> List[str]:
         """
@@ -256,7 +260,7 @@ class PackageRepository:
         """
         try:
             logger.info("刷新已安装包列表")
-            installed = brew.list_installed()
+            installed = self.package_manager.list_installed()
             self._installed_cache = set(installed)
             logger.debug(f"已安装 {len(installed)} 个软件包")
             return installed
@@ -264,6 +268,43 @@ class PackageRepository:
             logger.error(f"获取已安装包列表失败: {e}")
             self._installed_cache = set()
             return []
+    
+    def get_package_info_batch(self, package_names: List[str]) -> List[Optional[Package]]:
+        """
+        批量并发获取多个软件包的详细信息
+        
+        参数:
+            package_names: 软件包名称列表
+        
+        返回:
+            List[Optional[Package]]: Package对象列表
+        
+        性能优化:
+            使用并发执行,比逐个查询快得多
+        
+        示例:
+            packages = repo.get_package_info_batch(['vim', 'git', 'wget'])
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        max_workers = min(10, len(package_names))
+        results = {}
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_name = {
+                executor.submit(self.get_package_info, name): name 
+                for name in package_names
+            }
+            
+            for future in as_completed(future_to_name):
+                name = future_to_name[future]
+                try:
+                    results[name] = future.result()
+                except Exception as e:
+                    logger.warning(f"批量获取包信息失败 ({name}): {e}")
+                    results[name] = None
+        
+        return [results.get(name) for name in package_names]
     
     def clear_cache(self):
         """

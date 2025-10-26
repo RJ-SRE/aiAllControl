@@ -180,17 +180,14 @@ class PackageService:
                 total_count=0
             )
         
-        logger.info(f"搜索到 {len(package_names)} 个软件包，正在获取详细信息...")
+        logger.info(f"搜索到 {len(package_names)} 个软件包，正在并发获取详细信息...")
         
         packages = []
-        for name in package_names:
-            try:
-                package = self.repository.get_package_info(name)
-                if package:
-                    packages.append(package)
-            except Exception as e:
-                logger.warning(f"获取包信息失败 ({name}): {e}")
-                continue
+        package_list = self.repository.get_package_info_batch(package_names)
+        
+        for package in package_list:
+            if package:
+                packages.append(package)
         
         preferred_licenses = config.get('preferred_license', ['MIT', 'Apache-2.0', 'GPL-3.0'])
         
@@ -268,7 +265,8 @@ class PackageService:
         try:
             logger.info(f"正在安装 {package_name} (类型: {package.package_type.value})...")
             
-            success = brew.install(package_name, is_cask=is_cask)
+            options = {'is_cask': is_cask} if is_cask else None
+            success = brew.install(package_name, options)
             
             if success:
                 logger.info(f"安装成功: {package_name}")
@@ -378,17 +376,14 @@ class PackageService:
                 logger.info("未安装任何软件包")
                 return []
             
-            logger.debug(f"已安装 {len(package_names)} 个软件包，正在获取详细信息...")
+            logger.debug(f"已安装 {len(package_names)} 个软件包，正在并发获取详细信息...")
             
             packages = []
-            for name in package_names:
-                try:
-                    package = self.repository.get_package_info(name)
-                    if package:
-                        packages.append(package)
-                except Exception as e:
-                    logger.warning(f"获取包信息失败 ({name}): {e}")
-                    continue
+            package_list = self.repository.get_package_info_batch(package_names)
+            
+            for package in package_list:
+                if package:
+                    packages.append(package)
             
             packages.sort(key=lambda p: p.name)
             
